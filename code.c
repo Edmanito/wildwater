@@ -161,6 +161,60 @@ void parcourSuffixe(Arbre* arbre){
 }
 
 
+int identiqueArbre(Arbre* arbre1 , Arbre* arbre2){
+    if(arbre1 == NULL && arbre2 == NULL)return 1;
+
+    if(arbre1->valeur == 0 || arbre2->valeur == 0)return 0;
+
+    if(arbre1->valeur != arbre2->valeur)return -1;
+    else{
+        identique(arbre1->fg, arbre2->fg);
+        identique(arbre1->fd, arbre2->fd);
+    }
+}
+
+
+
+Arbre* rechercheABZ(Arbre* arbre, int x){
+    if(arbre == NULL)return NULL;
+
+    if(x==0)return arbre;
+
+    if(x%2==0){
+        return rechercheABZ(arbre->fg, x);
+        
+        
+        if(x < arbre->valeur){
+            return recherche(arbre->fg);
+        }
+        else{
+            return recherche(arbre->fd);
+        }
+
+
+    }
+    
+    else{
+        return rechercheABZ(arbre->fd, x);
+        
+        if(x < arbre->valeur){
+            return recherche(arbre->fd);
+        }
+        else{
+            return recherche(arbre->fg);
+        }
+
+    }
+} 
+
+
+
+
+
+
+
+
+
 
 /////////////////////////////////       AVL     ////////////////////////////////////
 
@@ -171,6 +225,31 @@ typedef struct{
     struct ArbreVL* fg
     struct ArbreVL* fd
 }ArbreVL;
+
+
+
+
+int nbrNoeud(ArbreVL* arbre){
+    if(arbre == NULL)return 0;
+    return 1 + nbrNoeud(arbre->fg) + nbrNoeud(arbre->fd);
+}
+
+
+int nbrFeuille(ArbreVL* arbre){
+    if(arbre == NULL)return 0;
+    
+    if(arbre->fg==NULL && arbre->fd==NULL)return 1;
+    
+    
+    else{
+         return nbrFeuille(arbre->fg) + nbrFeuille(arbre->fd);
+    }
+}
+
+
+int tailleArbre(ArbreVL* arbre){
+    return nbrNoeud(arbre) - nbrFeuille(arbre);
+}
 
 
 
@@ -192,18 +271,27 @@ Arbre* rotaionDroite(ArbreVL* arbre){
     pivot->fd = arbre;
 
 
-    arbre->equilibre = hauteur(a->fd) - hauteur(a->fg);
+    arbre->equilibre = hauteur(->fd) - hauteur(a->fg);
     pivot->equilibre = hauteur(pivot->fd) - hauteur(pivot->fg);
     
     return pivot;
 }
 
 
+Arbre* rotationDroit(ArbreVL* arbre){
 
+    ArbreVL* pivot = arbre->fg;
+    arbre->fg = pivot->fd;
+    pivot->fd = arbre;
 
+    arbre->equilibre = hauteur(arbre->fd) - hauteur(arbre->fg);
+    pivot->equilibre = hauteur(pivot->fd) - hauteur(pivot->fg);
 
+    return pivot;
 
+}
 
+// 
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 
