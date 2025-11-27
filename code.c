@@ -190,8 +190,6 @@ Arbre* rechercheABZ(Arbre* arbre, int x){
         else{
             return recherche(arbre->fd);
         }
-
-
     }
     
     else{
