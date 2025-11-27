@@ -17,14 +17,14 @@ Arbre* creationNoeud(int x){
     arbre->fg = NULL;
     arbre->fd = NULL;
 
-    return a;
+    return arbre;
 }
 
 Arbre* inserer(Arbre* arbre, int x){
     if(arbre==NULL) return creationNoeud(x);
     //chercher le noeud
     if(x < arbre->valeur){
-        arbre->fg = inserer(arbre->fg, x)
+        arbre->fg = inserer(arbre->fg, x);
     }
 
     if(x>arbre->valeur){
@@ -83,7 +83,7 @@ Arbre* supprimerNoeud(Arbre* arbre, int x){
 
     //On cherche le noeud
     if(x < arbre->valeur){
-        arbre->fg = supprimerNoeud(arbre->fg, x)
+        arbre->fg = supprimerNoeud(arbre->fg, x);
         return arbre;
     }
 
@@ -140,7 +140,7 @@ Arbre* supprimerNoeud(Arbre* arbre, int x){
 
 void parcourPrefixe(Arbre* arbre){
     if(arbre == NULL) return;
-    printf("%d", arbre->valeur);
+    printf("|%d ", arbre->valeur);
     parcourPrefixe(arbre->fg);
     parcourPrefixe(arbre->fd);
 }
@@ -148,7 +148,7 @@ void parcourPrefixe(Arbre* arbre){
 void parcourInfixe(Arbre* arbre){
     if(arbre == NULL) return;
     parcourInfixe(arbre->fg);
-    printf("%d", arbre->valeur);
+    printf("|%d ", arbre->valeur);
     parcourInfixe(arbre->fd);
 }
 
@@ -157,7 +157,7 @@ void parcourSuffixe(Arbre* arbre){
     if(arbre == NULL) return;
     parcourSuffixe(arbre->fg);
     parcourSuffixe(arbre->fd);
-    printf("%d", arbre->valeur);
+    printf("|%d ", arbre->valeur);
 }
 
 
@@ -166,7 +166,17 @@ void parcourSuffixe(Arbre* arbre){
 
 int main(void){
 
+    Arbre* arbre = NULL;
+    
+    arbre = creationNoeud(5);
+    arbre = inserer(arbre, 3);
+    arbre = inserer(arbre, 50);
+    arbre = inserer(arbre, 1);
+    arbre = inserer(arbre, 15);
+    arbre = inserer(arbre, 17);
+    arbre = inserer(arbre, 99);
 
+    parcourInfixe(arbre);
 
     printf("\n");
     return 0;
