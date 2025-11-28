@@ -8,7 +8,8 @@ SRC = \
     src/tree.c \
     src/utils.c
 
-EXEC = Saitama
+EXEC_DIR = exec
+EXEC = $(EXEC_DIR)/Wildwater
 
 .PHONY: all compile run clean
 
@@ -16,14 +17,23 @@ all: $(EXEC)
 
 $(EXEC): $(SRC)
 	@echo "Compilation..."
+	@mkdir -p $(EXEC_DIR)
 	@$(CC) $(CFLAGS) -o $(EXEC) $(SRC)
 
+
+
+#Nettoyage
+clean:
+	@echo "Nettoyage..."
+	@rm -f $(EXEC)
+
+
+#Compilation
 compile: clean all
 
+
+#Execution
 run: all
 	@echo "Exécution..."
 	@./$(EXEC)
 
-clean:
-	@echo "Nettoyage..."
-	@rm -f $(EXEC)
