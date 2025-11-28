@@ -134,6 +134,12 @@ Arbre* supprimerNoeud(Arbre* arbre, int x){
 
 }
 
+    Arbre* succ = minNoeud(arbre->fd);
+
+    arbre->valeur = succ->valeur;
+
+    arbre->fd = suppirmerNoeud(arbre->fd, succ ->valeur)
+
 
 
 
@@ -251,6 +257,11 @@ int tailleArbre(ArbreVL* arbre){
 
 
 
+int equilibre(ArbreVL* arbre){
+    return hauteur(arbre->fd) - hauteur(arbre->fg);
+}
+
+
 
 Arbre* rotationGauche(ArbreVL* arbre){
     Arbre* pivot = arbre->fd;
@@ -269,25 +280,121 @@ Arbre* rotaionDroite(ArbreVL* arbre){
     pivot->fd = arbre;
 
 
-    arbre->equilibre = hauteur(->fd) - hauteur(a->fg);
+    arbre->equilibre = hauteur(arbre->fd) - hauteur(arbre->fg);
     pivot->equilibre = hauteur(pivot->fd) - hauteur(pivot->fg);
     
     return pivot;
 }
 
 
-Arbre* rotationDroit(ArbreVL* arbre){
+Arbre* doubleRotationGauche(ArbreVL* arbre){
+    arbre->fd = rotationDroit(arbre->fd);
+    return rotationGauche(arbre);
+}
 
-    ArbreVL* pivot = arbre->fg;
-    arbre->fg = pivot->fd;
-    pivot->fd = arbre;
+
+
+
+Arbre* doubleRotationGauche(ArbreVL* arbre){
+    arbre->fd = rotationDroite(arbre->fd);
+    
+    return rotationGauche(arbre);
+}
+
+
+
+
+Arbre* equilibre(ArbreVL* arbre){
+    if(arbre==NULL)return NULL;
+
+    if(arbre->equilibre>=2){
+        if(arbre->fd->equilibre>=0){
+            return rotationGauche(arbre);
+        }
+        return doublerotationGauche(arbre)
+    }
+
+
+
+
+}
+Arbre* equilibre(ArbreVL* arbre){
+
+    if(arbre->equilibre>=2){
+        if(arbre->fd->equilibre>=0){
+            return rotationGauche(arbre);
+        }
+        return doubleRotationGauche(arbre);
+    }
+
+    else if (arbre->equilibre<=-2){
+        if(arbre->fg->equilibre<=0){
+            return rotationDroit(arbre);
+        }
+            return doubleRotationDroit(arbre);
+    }
+
+    return arbre;
+}
+
+
+Arbre* rotationGauche(ArbreVL* arbre){
+
+    ArbreVL* pivot = arbre->fd;
+    arbre->fd = pivot->fg;
+    pivot ->fd = arbre;
+
 
     arbre->equilibre = hauteur(arbre->fd) - hauteur(arbre->fg);
     pivot->equilibre = hauteur(pivot->fd) - hauteur(pivot->fg);
 
     return pivot;
+}
+
+
+Arbre* doublerotationGauche(ArbreVL* arbre){
+    arbre->fd = rotationdroitdroit(arbre->fd);
+    return rotationgauche(arbre); 
+}
+
+
+Arbre* equilibre(ArbreVL* arbre){
+    if(arbre == NULL)return NULL;
+    
+    
+    if(arbre->equilibre>=2){
+        if(arbre->fd->equilibre>=0){
+            return rotationgauche(arbre);
+        }
+        return doublerotationgauche(arbre);
+    }
+
+
+
+
+    return arbre;
 
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 // 
 
