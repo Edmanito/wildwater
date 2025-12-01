@@ -5,6 +5,7 @@
 
 int main(void){
 
-    printf("\ntest\n\n");
+    printf("\n Test \n\n");
     return 0;
 }
+
