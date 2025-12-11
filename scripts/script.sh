@@ -1,112 +1,119 @@
 #!/bin/bash
 
+# COULEURS
+GREEN="\e[92m"
+BLUE="\e[94m"
+YELLOW="\e[93m"
+RED="\e[91m"
+RESET="\e[0m"
 
-start=$(date +%s)  ## on stock l'heure du depart dans start
+# TIMER
+start=$(date +%s)
 
-
-
-
-                                            ##### Commande principale #####
-
-
-
-#Verification de s'il n y a aucun argument.
-if [ $# -lt 1 ]; then
-    echo "Usage : $0 {histo max|src|real | leaks <ID_usine>}"
+# ARGUMENTS
+if [ $# -lt 2 ]; then
+    echo -e "${RED}✖️ Usage : $0 <fichier.csv> histo {max|src|real} | leaks <ID>${RESET}"
     exit 1
 fi
 
-cmd=$1   
+INPUT="$1"
+CMD="$2"
+MODE="$3"
 
-
-                                            ##### PARTIE HISTOGRAMME #####
-
-if [ "$cmd" = "histo" ]; then
-
-    # On doit avoir 2 arguments : histo + (max/src/real)
-    if [ $# -ne 2 ]; then
-        echo "Erreur : histo nécessite un argument : max | src | real"
-        exit 1
-    fi
-
-    mode=$2
-
-    # Vérification du mode
-    if [ "$mode" != "max" ] && [ "$mode" != "src" ] && [ "$mode" != "real" ]; then
-        echo "Mode histo invalide"
-        exit 1
-    fi
-
-    
-    # FILTRAGE AVEC AWK
-    # On récupère les lignes SOURCES->USINES
-    
-    awk -F';' '$1=="-" && $4!="-" && $5!="-" {print}' big.csv > data/sources.csv
-
-    # On récupère les lignes USINES SEULES
-    awk -F';' '$1=="-" && $3=="-" && $5=="-" {print}' big.csv > data/usines.csv
-
-    
-    # Compilation automatique du C
-    
-    if [ ! -f exe ]; then
-        make
-        if [ $? -ne 0 ]; then
-            echo "Erreur : compilation échouée"
-            exit 1
-        fi
-    fi
-
-    
-    # Appel au programme C
-    
-    ./exe histo "$mode" data/sources.csv data/usines.csv > data/histo_output.csv
-
-    if [ $? -ne 0 ]; then
-        echo "Erreur dans le programme C"
-        exit 1
-    fi
-
-    echo "Histogramme CSV généré dans data/histo_output.csv"
-
+if [ ! -f "$INPUT" ]; then
+    echo -e "${RED}✖️ Le fichier '$INPUT' n'existe pas.${RESET}"
+    exit 1
 fi
 
+########################################################
+#                      HISTO                           #
+########################################################
 
-####
-#                       PARTIE LEAKS
-if [ "$cmd" = "leaks" ]; then
+if [ "$CMD" = "histo" ]; then
 
-    if [ $# -ne 2 ]; then
-        echo "Erreur : leaks nécessite un ID d'usine"
+    if [ -z "$MODE" ]; then
+        echo -e "${RED}✖️ histo nécessite un mode : max | src | real${RESET}"
         exit 1
     fi
 
-    usine="$2"
-
-    # Filtrage : toutes les lignes où apparait l’usine
-    grep "$usine" big.csv > data/reseau.csv
-
-    if [ ! -f exe ]; then
-        make
-        if [ $? -ne 0 ]; then
-            echo "Erreur compilation"
-            exit 1
-        fi
+    if [ "$MODE" != "max" ] && [ "$MODE" != "src" ] && [ "$MODE" != "real" ]; then
+        echo -e "${RED}✖️ Mode histo inconnu : '$MODE'${RESET}"
+        exit 1
     fi
 
-    # Appel du C
-    ./exe leaks "$usine" data/reseau.csv > data/temp_fuites.txt
+    ########################################################
+    #                    HISTO MAX                         #
+    ########################################################
+    if [ "$MODE" = "max" ]; then
+        echo -e "${BLUE}┌──────────────────────────────────────────┐${RESET}"
+        echo -e "${BLUE}│   ${GREEN}Histogramme : Mode MAX${BLUE}                      │${RESET}"
+        echo -e "${BLUE}└──────────────────────────────────────────┘${RESET}"
 
-    valeur=$(cat data/temp_fuites.txt)
+        OUTFILE="histo_max.dat"
 
-    echo "$usine ; $valeur" >> data/leaks.dat
+        echo -e "${YELLOW}➤ Lecture du fichier...${RESET}"
+        echo "identifier;max_volume(k.m3.year-1)" > "$OUTFILE"
 
-    echo "Fuites calculées : $valeur M.m3"
+        echo -e "${YELLOW}➤ Extraction des capacités maximales...${RESET}"
+        grep ";-;" "$INPUT" | grep -E "Facility|Factory" \
+            | awk -F';' '{print $2 ";" $4}' \
+            | sort -r >> "$OUTFILE"
+
+        echo -e "${GREEN}✔️  Fichier créé :${RESET} $OUTFILE"
+        echo -e "${BLUE}⏳ Temps : $(( $(date +%s) - start ))s${RESET}"
+        echo -e "${BLUE}────────────────────────────────────────────${RESET}"
+        exit 0
+    fi
+
+    ########################################################
+    #                    HISTO SRC                         #
+    ########################################################
+    if [ "$MODE" = "src" ]; then
+        echo -e "${BLUE}┌──────────────────────────────────────────┐${RESET}"
+        echo -e "${BLUE}│   ${GREEN}Histogramme : Mode SRC${BLUE}                      │${RESET}"
+        echo -e "${BLUE}└──────────────────────────────────────────┘${RESET}"
+
+        OUTFILE="histo_src.dat"
+        echo "identifier;source_volume(k.m3.year-1)" > "$OUTFILE"
+
+        echo -e "${YELLOW}➤ Extraction des volumes captés...${RESET}"
+
+        grep "Spring #" "$INPUT" \
+            | awk -F';' '{print $3 ";" $4}' \
+            | sort -r >> "$OUTFILE"
+
+        echo -e "${GREEN}✔️  Fichier créé :${RESET} $OUTFILE"
+        echo -e "${BLUE}⏳ Temps : $(( $(date +%s) - start ))s${RESET}"
+        echo -e "${BLUE}────────────────────────────────────────────${RESET}"
+        exit 0
+    fi
+
+    ########################################################
+    #                    HISTO REAL                        #
+    ########################################################
+    if [ "$MODE" = "real" ]; then
+        echo -e "${BLUE}┌──────────────────────────────────────────┐${RESET}"
+        echo -e "${BLUE}│   ${GREEN}Histogramme : Mode REAL${BLUE}                     │${RESET}"
+        echo -e "${BLUE}└──────────────────────────────────────────┘${RESET}"
+
+        OUTFILE="histo_real.dat"
+        echo "identifier;real_volume(k.m3.year-1)" > "$OUTFILE"
+
+        echo -e "${YELLOW}➤ Préparation des volumes réels...${RESET}"
+
+        grep "Spring #" "$INPUT" \
+            | awk -F';' '{print $3 ";" $4 ";" $5}' \
+            | sort -r >> "$OUTFILE"
+
+        echo -e "${GREEN}✔️  Fichier créé :${RESET} $OUTFILE"
+        echo -e "${BLUE}⏳ Temps : $(( $(date +%s) - start ))s${RESET}"
+        echo -e "${BLUE}────────────────────────────────────────────${RESET}"
+        exit 0
+    fi
 fi
 
-
-# Affichage de la durée totale
-end=$(date +%s)
-echo "Durée totale : $(($end - $start)) secondes"
-
-exit 0
+########################################################
+#                COMMANDE INCONNUE                     #
+########################################################
+echo -e "${RED}✖️ Commande invalide : '$CMD'${RESET}"
+exit 1

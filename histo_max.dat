@@ -1,0 +1,34 @@
+identifier;max_volume(k.m3.year-1)
+Storage #15002;-
+Storage #15001;-
+Storage #13201;-
+Storage #13200;-
+Storage #13102;-
+Storage #13101;-
+Service #LD300002;-
+Service #LD300001;-
+Service #LD210002;-
+Service #LD210001;-
+Service #LD200003;-
+Service #LD200002;-
+Service #LD200001;-
+Service #LD200001;-
+Junction #TM30002;-
+Junction #TM30001;-
+Junction #TM20002;-
+Junction #TM20001;-
+Junction #TM10002;-
+Junction #TM10001;-
+Junction #TM10001;-
+Factory #GF700210Z;5220000
+Factory #GF700210Z;5220000
+Factory #GF700210Z;-
+Factory #GF700210Z;-
+Facility plant #RH500010D;3892000
+Facility plant #RH500010D;3892000
+Facility plant #RH500010D;-
+Facility plant #RH500010D;-
+Facility complex #RH400001F;4749000
+Facility complex #RH400001F;4749000
+Facility complex #RH400001F;-
+Facility complex #RH400001F;-

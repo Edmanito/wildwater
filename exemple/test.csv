@@ -1,0 +1,53 @@
+-;Spring #MQ001001A;Facility complex #RH400001F;20892;0.997
+-;Spring #MQ001002B;Facility complex #RH400001F;15432;1.204
+-;Spring #MQ001003C;Facility plant #RH500010D;9811;0.883
+-;Spring #MQ001004D;Facility plant #RH500010D;17780;1.445
+-;Spring #MQ001005E;Factory #GF700210Z;25300;0.542
+
+-;Facility complex #RH400001F;-;4749000;-
+-;Facility plant #RH500010D;-;3892000;-
+-;Factory #GF700210Z;-;5220000;-
+
+-;Facility complex #RH400001F;Storage #13101;-;3.445
+-;Facility complex #RH400001F;Storage #13102;-;2.910
+-;Facility plant #RH500010D;Storage #13200;-;4.112
+-;Factory #GF700210Z;Storage #15001;-;3.005
+
+Facility complex #RH400001F;Storage #13101;Junction #TM10001;-;3.308
+Facility complex #RH400001F;Storage #13102;Junction #TM10002;-;2.991
+Facility plant #RH500010D;Storage #13200;Junction #TM20001;-;3.501
+Factory #GF700210Z;Storage #15001;Junction #TM30001;-;4.288
+
+Facility complex #RH400001F;Junction #TM10001;Service #LD200001;-;3.735
+Facility complex #RH400001F;Junction #TM10001;Service #LD200002;-;2.119
+Facility complex #RH400001F;Junction #TM10002;Service #LD200003;-;3.002
+Facility plant #RH500010D;Junction #TM20001;Service #LD210001;-;4.992
+Factory #GF700210Z;Junction #TM30001;Service #LD300001;-;3.771
+
+Facility complex #RH400001F;Service #LD200001;Cust #TJ000001Z;-;7.233
+Facility complex #RH400001F;Service #LD200001;Cust #TJ000002Z;-;6.901
+Facility complex #RH400001F;Service #LD200002;Cust #TJ000003Z;-;5.112
+Facility complex #RH400001F;Service #LD200003;Cust #TJ000004Z;-;4.909
+Facility plant #RH500010D;Service #LD210001;Cust #TJ000005Z;-;6.442
+Factory #GF700210Z;Service #LD300001;Cust #TJ000006Z;-;3.887
+
+-;Spring #MQ001006F;Facility complex #RH400001F;12211;0.772
+-;Spring #MQ001007G;Facility complex #RH400001F;19902;1.022
+-;Spring #MQ001008H;Facility plant #RH500010D;17888;1.788
+-;Spring #MQ001009I;Factory #GF700210Z;14500;0.992
+
+-;Facility complex #RH400001F;-;4749000;-
+-;Facility plant #RH500010D;-;3892000;-
+-;Factory #GF700210Z;-;5220000;-
+
+-;Facility plant #RH500010D;Storage #13201;-;3.991
+-;Factory #GF700210Z;Storage #15002;-;3.228
+
+Facility plant #RH500010D;Storage #13201;Junction #TM20002;-;4.091
+Factory #GF700210Z;Storage #15002;Junction #TM30002;-;3.771
+
+Facility plant #RH500010D;Junction #TM20002;Service #LD210002;-;4.220
+Factory #GF700210Z;Junction #TM30002;Service #LD300002;-;3.619
+
+Facility plant #RH500010D;Service #LD210002;Cust #TJ000007Z;-;7.119
+Factory #GF700210Z;Service #LD300002;Cust #TJ000008Z;-;6.992
