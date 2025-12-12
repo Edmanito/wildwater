@@ -2,12 +2,11 @@
 
 start=$(date +%s)
 
-Vérification des arguments
+# Vérification des arguments
 if [ $# -lt 2 ]; then
     echo "Usage : $0 <fichier.csv> histo {max|src|real} | leaks <ID>"
     exit 1
 fi
-
 
 INPUT="$1"
 CMD="$2"
@@ -18,8 +17,10 @@ if [ ! -f "$INPUT" ]; then
     exit 1
 fi
 
+mkdir -p data
+
 ##############################################
-HISTO
+#                    HISTO                  #
 ##############################################
 
 if [ "$CMD" = "histo" ]; then
@@ -39,7 +40,7 @@ if [ "$CMD" = "histo" ]; then
     ##############################################
     if [ "$MODE" = "max" ]; then
         echo "Histogramme (mode max)"
-        OUTFILE="histo_max.dat"
+        OUTFILE="data/histo_max.dat"
 
         echo "identifier;max_volume(k.m3.year-1)" > "$OUTFILE"
 
@@ -58,7 +59,7 @@ if [ "$CMD" = "histo" ]; then
     ##############################################
     if [ "$MODE" = "src" ]; then
         echo "Histogramme (mode src)"
-        OUTFILE="histo_src.dat"
+        OUTFILE="data/histo_src.dat"
 
         echo "identifier;source_volume(k.m3.year-1)" > "$OUTFILE"
 
@@ -72,13 +73,12 @@ if [ "$CMD" = "histo" ]; then
         exit 0
     fi
 
-
     ##############################################
     #                 HISTO REAL                 #
     ##############################################
     if [ "$MODE" = "real" ]; then
         echo "Histogramme (mode real)"
-        OUTFILE="histo_real.dat"
+        OUTFILE="data/histo_real.dat"
 
         echo "identifier;real_volume(k.m3.year-1)" > "$OUTFILE"
 
@@ -96,4 +96,4 @@ fi
 echo "Erreur : commande inconnue '$CMD'"
 exit 1
 
-*
+

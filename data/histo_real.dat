@@ -1,0 +1,10 @@
+identifier;real_volume(k.m3.year-1)
+Factory #GF700210Z;25300;0.542
+Factory #GF700210Z;14500;0.992
+Facility plant #RH500010D;9811;0.883
+Facility plant #RH500010D;17888;1.788
+Facility plant #RH500010D;17780;1.445
+Facility complex #RH400001F;20892;0.997
+Facility complex #RH400001F;19902;1.022
+Facility complex #RH400001F;15432;1.204
+Facility complex #RH400001F;12211;0.772
