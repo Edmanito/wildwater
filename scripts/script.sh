@@ -39,21 +39,26 @@ if [ "$CMD" = "histo" ]; then
     #                 HISTO MAX                  #
     ##############################################
     if [ "$MODE" = "max" ]; then
-        echo "Histogramme (mode max)"
-        OUTFILE="data/histo_max.dat"
+    echo "Histogramme (mode max)"
+    OUTFILE="data/histo_max.dat"
+    mkdir -p data
 
-        echo "identifier;max_volume(k.m3.year-1)" > "$OUTFILE"
+    echo "max_volume(k.m3.year-1)" > "$OUTFILE"
 
-        echo "Extraction en cours..."
-        grep ";-;" "$INPUT" | grep -E "Facility|Factory" \
-            | awk -F';' '{print $2 ";" $4}' \
-            | sort -r >> "$OUTFILE"
+    echo "Extraction en cours..."
+    awk -F';' '
+        $1 == "-" && $3 == "-" && $5 == "-" {
+            print $4
+        }
+    ' "$INPUT" | sort -nr >> "$OUTFILE"
 
-        echo "Fichier généré : $OUTFILE"
-        echo "Terminé en $(( $(date +%s) - start )) secondes"
-        exit 0
-    fi
+    echo "Fichier généré : $OUTFILE"
+    echo "Terminé en $(( $(date +%s) - start )) secondes"
+    exit 0
+fi
 
+
+#mettre le ^ juste apres le grep
     ##############################################
     #                 HISTO SRC                  #
     ##############################################
