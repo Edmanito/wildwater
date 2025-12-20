@@ -1,20 +1,23 @@
 #ifndef AVL_H
 #define AVL_H
 
-// Structure d’un nœud d’AVL
-typedef struct{
-    char id[64];            // Identifiant de la station
-    double valeur1;         // Première valeur
-    double valeur2;         // Deuxième valeur
-    double valeur3;         // Troisième valeur
-    int hauteur;            // Hauteur du nœud
-    struct Avl *fg;         // Fils gauche
-    struct Avl *fd;         // Fils droit
-} AVL;
+#include <stdio.h>
 
-// Fonctions AVL
-AVL* insererAVL(AVL *racine, const char *id, double v1, double v2, double v3);
-void afficherAVL(const AVL *racine);
-int hauteurAVL(const AVL *noeud);
+/* Usine */
+typedef struct {
+    char *id;
+    double max;
+    double src;
+    double real;
+} usine_t;
+
+/* AVL opaque */
+typedef struct noeud_avl noeud_avl_t;
+
+/* Strict minimum */
+noeud_avl_t *avl_inserer(noeud_avl_t *r, usine_t *u);
+usine_t    *avl_trouver(noeud_avl_t *r, const char *id);
+void        avl_ecrire(noeud_avl_t *r, FILE *out, int mode);
+void        avl_liberer(noeud_avl_t *r);
 
 #endif

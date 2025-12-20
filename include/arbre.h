@@ -1,17 +1,14 @@
 #ifndef ARBRE_H
 #define ARBRE_H
 
-// Structure représentant un nœud d'arbre général
-typedef struct{
-    char id[64];               // Identifiant du nœud
-    int nbEnfants;             // Nombre d’enfants
-    struct Noeud **enfants;    // Tableau dynamique de pointeurs vers les enfants
-} Noeud;
+typedef struct noeud noeud_t;
 
-// Crée un nœud
-Noeud* creerNoeud(const char *id);
-
-// Ajoute un enfant
-void ajouterEnfant(Noeud *parent, Noeud *enfant);
+/* Minimum vital */
+noeud_t *obtenir_noeud(const char *id);
+void     ajouter_arete(const char *amont,
+                       const char *aval,
+                       double fuite);
+double   calculer_fuites(noeud_t *racine, double debit);
+void     liberer_graphe(void);
 
 #endif
