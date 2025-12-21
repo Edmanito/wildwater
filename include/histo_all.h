@@ -7,4 +7,3 @@ int generer_histo_all(const char *csv_max,
                       const char *csv_out);
 
 #endif
-

@@ -1,145 +1,101 @@
+#include "../include/arbre.h"
+#include "../include/leaks.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "leaks.h"
 
-/*
- * Implémentation simple et robuste du calcul des fuites.
- * Toute la logique est ici.
- * Aucun main dans ce fichier.
- *
- * Hypothèse simplifiée :
- * - on calcule le volume réellement traité à l'usine
- * - on applique les pourcentages de fuite de tous les tronçons aval
- *   traités par cette usine
- */
+static double total_fuites_global = 0.0;
 
-int leaks_compute(
-    const char *csv_path,
-    const char *plant_id,
-    const char *out_csv,
-    const char *history_dat
-) {
-    FILE *f = fopen(csv_path, "r");
-    if (!f) return 1;
+// --- Fonction inspirée de ton code pour gérer l'écriture et les doublons ---
+static int ecriture_fichier_verifiee(const char* chemin_fichier, char* id, double volume) {
+    FILE* f;
+    char id_lu[128];
+    double volume_lu;
+    int trouve = 0;
+    
+    // Ouverture en mode ajout+lecture (crée le fichier s'il n'existe pas)
+    f = fopen(chemin_fichier, "a+");
+    if (f == NULL) {
+        perror("Erreur ouverture fichier leaks");
+        return 3;   
+    }
 
-    char line[2048];
-    int plant_found = 0;
-    double treated_volume = 0.0;
-    double total_leaks = 0.0;
+    // IMPORTANT : On se remet au début pour vérifier tout le fichier
+    rewind(f);
 
-    /* ============================================================
-     * PASS 1 : calcul du volume réellement traité par l'usine
-     * (SOURCE -> USINE)
-     * ============================================================ */
-    while (fgets(line, sizeof(line), f)) {
-        char *c1 = strtok(line, ";");      // col 1
-        char *c2 = strtok(NULL, ";");      // col 2
-        char *c3 = strtok(NULL, ";");      // col 3
-        char *c4 = strtok(NULL, ";");      // volume
-        char *c5 = strtok(NULL, ";\n");    // fuite %
-
-        if (!c1 || !c2 || !c3 || !c4 || !c5)
-            continue;
-
-        /* SOURCE -> USINE */
-        if (strcmp(c1, "-") == 0 && strcmp(c3, plant_id) == 0) {
-            double vol = atof(c4);
-            double leak = atof(c5);
-            treated_volume += vol * (1.0 - leak / 100.0);
-            plant_found = 1;
-        }
-
-        /* Ligne descriptive de l'usine */
-        if (strcmp(c1, "-") == 0 && strcmp(c2, plant_id) == 0) {
-            plant_found = 1;
+    // Lecture ligne par ligne. 
+    // Format attendu : ID;VOLUME k.m3;
+    // On ignore le reste de la ligne avec %*s si besoin, ou on matche exactement le format d'écriture
+    while (fscanf(f, "%127[^;];%lf k.m3;\n", id_lu, &volume_lu) == 2) {
+        if (strcmp(id, id_lu) == 0) {
+            trouve = 1;
+            break;
         }
     }
 
-    fclose(f);
-
-    /* ============================================================
-     * Usine inexistante
-     * ============================================================ */
-    if (!plant_found) {
-        FILE *o = fopen(out_csv, "w");
-        if (!o) return 2;
-        fprintf(o, "identifier;Leak volume (M.m3.year-1)\n");
-        fprintf(o, "%s;-1\n", plant_id);
-        fclose(o);
-
-        FILE *h = fopen(history_dat, "a");
-        if (h) {
-            fprintf(h, "%s;-1\n", plant_id);
-            fclose(h);
-        }
-
-        return 0;
+    if (!trouve) {
+        // On se place à la fin pour écrire (normalement a+ le fait, mais fseek sécurise après un rewind/lecture)
+        fseek(f, 0, SEEK_END);
+        
+        // Écriture au format demandé : ID;VOLUME k.m3;
+        fprintf(f, "%s;%.3f k.m3;\n", id, volume);
+        printf("[C] Ajout de l'usine %s (%.3f k.m3) dans le fichier.\n", id, volume);
+        
+        fclose(f);
+        return 1;  
     }
-
-    /* ===== PASS 2 : fuites directes usine ===== */
-f = fopen(csv_path, "r");
-if (!f) return 2;
-
-int out_count = 0;
-
-/* --- Comptage des tronçons sortants --- */
-while (fgets(line, sizeof(line), f)) {
-    char *c1 = strtok(line, ";");
-    strtok(NULL, ";");
-    strtok(NULL, ";");
-    strtok(NULL, ";");
-    char *c5 = strtok(NULL, ";\n");
-
-    if (!c1 || !c5) continue;
-
-    if (strcmp(c1, plant_id) == 0) {
-        out_count++;
+    else {
+        printf("[C] L'usine %s est déjà existante. Pas d'écriture.\n", id);
+        fclose(f);
+        return 2;
     }
 }
 
-if (out_count == 0) out_count = 1;
+// --- Logique de calcul (Inchangée) ---
+static void propager_flux(Noeud* noeud, double volume_actuel) {
+    if (!noeud || !noeud->liste_enfants) return;
 
-/* Revenir au début du fichier */
-rewind(f);
+    int nombre_enfants = 0;
+    for (Arete* a = noeud->liste_enfants; a; a = a->suivant) {
+        nombre_enfants++;
+    }
 
-/* --- Calcul des fuites réparties --- */
-while (fgets(line, sizeof(line), f)) {
-    char *c1 = strtok(line, ";");
-    strtok(NULL, ";");
-    strtok(NULL, ";");
-    strtok(NULL, ";");
-    char *c5 = strtok(NULL, ";\n");
+    if (nombre_enfants == 0) return;
 
-    if (!c1 || !c5) continue;
+    double volume_par_tuyau = volume_actuel / nombre_enfants;
 
-    if (strcmp(c1, plant_id) == 0) {
-        double leak = atof(c5);
-        double share = treated_volume / out_count;
-        total_leaks += share * (leak / 100.0);
+    for (Arete* a = noeud->liste_enfants; a; a = a->suivant) {
+        double perte = volume_par_tuyau * (a->pourcentage_fuite / 100.0);
+        total_fuites_global += perte;
+        propager_flux(a->enfant, volume_par_tuyau - perte);
     }
 }
 
-fclose(f);
+// --- Fonction Principale ---
+void traiter_fuites_stdin(const char* fichier_sortie) {
+    char ligne[512];
+    char arg1[128], arg2[128];
+    double valeur;
 
-
-    /* Conversion en millions de m³ */
-    double leaks_Mm3 = total_leaks / 1000.0;
-
-    /* ============================================================
-     * Sorties
-     * ============================================================ */
-    FILE *o = fopen(out_csv, "w");
-    if (!o) return 4;
-    fprintf(o, "identifier;Leak volume (M.m3.year-1)\n");
-    fprintf(o, "%s;%.6f\n", plant_id, leaks_Mm3);
-    fclose(o);
-
-    FILE *h = fopen(history_dat, "a");
-    if (h) {
-        fprintf(h, "%s;%.6f\n", plant_id, leaks_Mm3);
-        fclose(h);
+    // Lecture du pipeline Shell
+    while (fgets(ligne, sizeof(ligne), stdin)) {
+        if (sscanf(ligne, "SOURCE;%[^;];%lf", arg1, &valeur) == 2) {
+            ajouter_volume_source(arg1, valeur);
+        }
+        else if (sscanf(ligne, "PIPE;%[^;];%[^;];%lf", arg1, arg2, &valeur) == 3) {
+            ajouter_arete(arg1, arg2, valeur);
+        }
+        else if (sscanf(ligne, "LEAK;%[^;\n]", arg1) == 1) {
+            Noeud* noeud_depart = obtenir_noeud(arg1);
+            
+            // Calcul
+            total_fuites_global = 0.0;
+            propager_flux(noeud_depart, noeud_depart->volume_eau);
+            
+            // ÉCRITURE AVEC VÉRIFICATION
+            // On écrit directement dans le fichier passé en paramètre
+            ecriture_fichier_verifiee(fichier_sortie, arg1, total_fuites_global);
+        }
     }
-
-    return 0;
+    liberer_tout();
 }

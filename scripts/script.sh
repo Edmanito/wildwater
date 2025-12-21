@@ -1,90 +1,93 @@
 #!/bin/bash
 
 export LC_ALL=C
-START_TIME_MS=$(date +%s%3N)
 
-# ====== Timer (ms) partout ======
+# --- COULEURS & STYLE ---
+R='\033[0;31m' # Rouge (Erreur)
+G='\033[0;32m' # Vert (Succès)
+B='\033[0;34m' # Bleu (Info)
+Y='\033[1;33m' # Jaune (Titre)
+N='\033[0m'    # Neutre
+
+
+START=$(date +%s%3N)
+
+# Timer en miliseconde partout 
 finish_ms() {
     code="$1"; shift
-    [ $# -gt 0 ] && echo "$*"
-    END_TIME_MS=$(date +%s%3N)
-    echo "[INFO] Temps de traitement : $(( END_TIME_MS - START_TIME_MS )) ms"
+    [ $# -gt 0 ] && echo -e "${R}$*${N}"
+    END=$(date +%s%3N)
+    echo -e "${B}[INFO] Temps de traitement : $(( END - START )) ms${N}"
     exit "$code"
 }
 
-##############################################
-# Vérification des arguments
-##############################################
-
+# On verifie les arguments
 if [ $# -lt 3 ]; then
-    echo "Usage :"
+    echo -e "${Y}Usage :${N}"
     echo "  $0 data.csv histo {max|src|real|all}"
     echo "  $0 data.csv leaks <ID_USINE>"
     finish_ms 1
 fi
 
-INPUT="$1"
-CMD="$2"
-MODE="$3"
+FILE="$1"
+ACT="$2" # Action (histo/leaks)
+OPT="$3" # Option (mode ou ID)
 
-if [ ! -f "$INPUT" ]; then
-    finish_ms 1 "Erreur : fichier $INPUT introuvable"
+if [ ! -f "$FILE" ]; then
+    finish_ms 1 "Erreur : fichier $FILE introuvable"
 fi
 
-##############################################
+#######################
 # Création des dossiers
-##############################################
-
+#######################
 mkdir -p data data/histo data/dat data/tmp data/leaks
 
-##############################################
-# Conversion CSV -> DAT (gnuplot)
-##############################################
+###########################
+# Conversion des CSV en DAT
+###########################
 csv_to_dat() {
     IN="$1"
     OUT="$2"
     tail -n +2 "$IN" > "$OUT"
-    echo "[DAT] $OUT généré"
+    echo -e "${G}[DAT] $OUT généré${N}"
 }
 
-##############################################
-# ================= HISTOGRAMMES =============
-##############################################
-if [ "$CMD" = "histo" ]; then
 
-##############################################
-# HISTO MAX 
-##############################################
-if [ "$MODE" = "max" ]; then
-    CSV="data/histo/histo_max.csv"
-    DAT="data/dat/histo_max.dat"
+case "$ACT" in histo)
 
-    PNG_SMALL="data/histo/histo_max_50plus_petites.png"
-    PNG_BIG="data/histo/histo_max_10plus_grandes.png"
-
-    echo "Histogramme MAX"
-
-    echo "identifier;max_volume(k.m3.year-1)" > "$CSV"
-
-    # Filtrage selon consigne + tri par identifiant (ordre alphabétique inverse)
-    grep '^-' "$INPUT" \
-    | grep ';-;' \
-    | awk -F';' '$1=="-" && $3=="-" && $5=="-" && $4!="-" { print $2 ";" $4 }' \
-    | sort -t';' -k1,1r \
-    >> "$CSV"
-
-    # Conversion CSV -> DAT (sans en-tête)
-    csv_to_dat "$CSV" "$DAT"
-
-	SMALL_DAT="data/dat/histo_max_small50.dat"
-	BIG_DAT="data/dat/histo_max_big10.dat"
-
-	sort -t';' -k2,2n  "$DAT" | awk -F';' 'NR<=50 { print $1 ";" $2 }' > "$SMALL_DAT"
-	sort -t';' -k2,2nr "$DAT" | awk -F';' 'NR<=10 { print $1 ";" $2 }' > "$BIG_DAT"
+############################################################
+# ====================== HISTOGRAMMES =====================#
+############################################################
 
 
-    # Génération des 2 graphiques (50 plus petites / 10 plus grandes)
-gnuplot <<EOF
+    ##############
+    # HISTO REAL # 
+    ##############
+    if [ "$OPT" = "max" ]; then
+        CSV="data/histo/histo_max.csv"
+        DAT="data/dat/histo_max.dat"
+
+        P_SM="data/histo/histo_max_50plus_petites.png"
+        P_BG="data/histo/histo_max_10plus_grandes.png"
+
+        echo -e "${Y}Histogramme MAX${N}"
+        echo "identifier;max_volume(k.m3.year-1)" > "$CSV"
+
+        grep '^-' "$FILE" \
+        | grep ';-;' \
+        | awk -F';' '$1=="-" && $3=="-" && $5=="-" && $4!="-" { print $2 ";" $4 }' \
+        | sort -t';' -k1,1r \
+        >> "$CSV"
+
+        csv_to_dat "$CSV" "$DAT"
+
+        D_SM="data/dat/histo_max_small50.dat"
+        D_BG="data/dat/histo_max_big10.dat"
+
+        sort -t';' -k2,2n  "$DAT" | awk -F';' 'NR<=50 { print $1 ";" $2 }' > "$D_SM"
+        sort -t';' -k2,2nr "$DAT" | awk -F';' 'NR<=10 { print $1 ";" $2 }' > "$D_BG"
+
+        gnuplot <<EOF
 set datafile separator ";"
 set style fill solid 0.85 border -1
 set boxwidth 0.75
@@ -93,117 +96,95 @@ set key off
 set xtics rotate by -90 center offset 0,-8
 set tmargin 2
 set bmargin 16
-
 set terminal pngcairo size 1800,900 enhanced font "Arial,10"
 
 DATFILE="${DAT}"
 
-# ---- 50 plus petites ----
-set output "${PNG_SMALL}"
+set output "${P_SM}"
 set title "MAX — 50 plus petites usines (capacité maximale)"
 set xlabel "Usines" offset 0, 6
 set ylabel "Capacité maximale (M.m3/an)"
 plot sprintf("< sort -t';' -k2,2n %s | awk 'NR<=50'", DATFILE) \
-     using (\$2/1000.0):xticlabels(1) with boxes
+     using (\$2/1000.0):xticlabels(1) with boxes lc rgb "#3498db"
 
-# ---- 10 plus grandes ----
-set output "${PNG_BIG}"
+set output "${P_BG}"
 set title "MAX — 10 plus grandes usines (capacité maximale)"
 set xlabel "Usines" offset 0, 3
 set ylabel "Capacité maximale (M.m3/an)"
 plot sprintf("< sort -t';' -k2,2nr %s | awk 'NR<=10'", DATFILE) \
-     using (\$2/1000.0):xticlabels(1) with boxes
+     using (\$2/1000.0):xticlabels(1) with boxes lc rgb "#3498db"
 EOF
 
-    if [ $? -ne 0 ]; then
-        finish_ms 1 "[ERREUR] gnuplot a échoué"
+        [ $? -eq 0 ] || finish_ms 1 "[ERREUR] gnuplot a échoué"
+        echo -e "${G}[INFO] PNG généré : $P_SM${N}"
+        echo -e "${G}[INFO] PNG généré : $P_BG${N}"
+        finish_ms 0
     fi
 
-    echo "[INFO] PNG généré : $PNG_SMALL"
-    echo "[INFO] PNG généré : $PNG_BIG"
+    ##############
+    # HISTO SRC # 
+    ##############
+    if [ "$OPT" = "src" ]; then
+        CSV="data/histo/histo_src.csv"
+        DAT="data/dat/histo_src.dat"
 
-    finish_ms 0
-fi
+        REF_SM="data/dat/histo_max_small50.dat"
+        REF_BG="data/dat/histo_max_big10.dat"
 
+        T_DIR="data/tmp"
+        mkdir -p "$T_DIR"
 
+        T_IN="${T_DIR}/src_input.tmp"
+        T_CAL="${T_DIR}/src_calc.tmp"
 
-##############################################
-# HISTO SRC (volume total capté par usine)
-##############################################
-if [ "$MODE" = "src" ]; then
-    CSV="data/histo/histo_src.csv"
-    DAT="data/dat/histo_src.dat"
+        ID_SM="${T_DIR}/small50.ids"
+        ID_BG="${T_DIR}/big10.ids"
+        D_SM="${T_DIR}/histo_src_small50.dat"
+        D_BG="${T_DIR}/histo_src_big10.dat"
 
-    # Référence MAX (doit exister)
-    MAX_SMALL="data/dat/histo_max_small50.dat"
-    MAX_BIG="data/dat/histo_max_big10.dat"
+        P_SM="data/histo/histo_src_50plus_petites.png"
+        P_BG="data/histo/histo_src_10plus_grandes.png"
 
-    TMP_DIR="data/tmp"
-    mkdir -p "$TMP_DIR"
+        BIN="exec/Wildwater"
 
-    SMALL_IDS="${TMP_DIR}/small50.ids"
-    BIG_IDS="${TMP_DIR}/big10.ids"
-    SMALL_DAT="${TMP_DIR}/histo_src_small50.dat"
-    BIG_DAT="${TMP_DIR}/histo_src_big10.dat"
+        echo -e "${Y}Histogramme SRC${N}"
 
-    PNG_SMALL="data/histo/histo_src_50plus_petites.png"
-    PNG_BIG="data/histo/histo_src_10plus_grandes.png"
-
-    echo "Histogramme SRC"
-
-    # Vérif fichiers de référence MAX (auto-génération si manquants)
-    if [ ! -f "$MAX_SMALL" ] || [ ! -f "$MAX_BIG" ]; then
-        echo "[WARN] Fichiers MAX manquants ($MAX_SMALL / $MAX_BIG)."
-        echo "[WARN] Lancement automatique : histo max"
-        bash "$0" "$INPUT" histo max
-
-        # Re-vérification après génération
-        if [ ! -f "$MAX_SMALL" ] || [ ! -f "$MAX_BIG" ]; then
-            finish_ms 1 "[ERREUR] Impossible de générer les fichiers MAX ($MAX_SMALL / $MAX_BIG)."
+        if [ ! -f "$REF_SM" ] || [ ! -f "$REF_BG" ]; then
+            echo -e "${Y}[WARN] Fichiers MAX manquants → génération MAX${N}"
+            bash "$0" "$FILE" histo max
+            [ -f "$REF_SM" ] && [ -f "$REF_BG" ] || finish_ms 1 "[ERREUR] MAX introuvable après génération."
         fi
-    fi
 
-    echo "identifier;src_volume(k.m3.year-1)" > "$CSV"
+        if [ ! -x "$BIN" ]; then
+            echo -e "${B}[INFO] Compilation Wildwater...${N}"
+            make || finish_ms 1 "[ERREUR] Compilation Wildwater impossible"
+        fi
 
-    # Somme des volumes captés par usine (source -> usine)
-    awk -F';' '
-        $1=="-" && $3!="-" && $4!="-" && $5!="-" { print $3 ";" $4 }
-    ' "$INPUT" \
-    | sort -t';' -k1,1 \
-    | awk -F';' '
-        NR==1 { prev=$1; sum=$2; next }
-        $1==prev { sum+=$2; next }
-        { print prev ";" sum; prev=$1; sum=$2 }
-        END { if (NR>0) print prev ";" sum }
-    ' \
-    | sort -t';' -k1,1r \
-    >> "$CSV"
+        echo "identifier;src_volume(k.m3.year-1)" > "$CSV"
 
-    # CSV -> DAT (sans en-tête)
-    csv_to_dat "$CSV" "$DAT"
+        # entrée pour le C
+        awk -F';' '$1=="-" && $3!="-" && $4!="-" && $5!="-" { print $3 ";" $4 }' \
+            "$FILE" > "$T_IN"
+        [ -s "$T_IN" ] || finish_ms 1 "[ERREUR] T_IN vide : aucun flux source->usine."
 
-    # IDs des 50 petites / 10 grandes selon MAX (ordre déjà bon)
-    awk -F';' '{print $1}' "$MAX_SMALL" > "$SMALL_IDS"
-    awk -F';' '{print $1}' "$MAX_BIG"   > "$BIG_IDS"
+        "$BIN" histo src "$T_IN" "$T_CAL" \
+            || finish_ms 1 "[ERREUR] histo src (C via main) a échoué"
+        [ -s "$T_CAL" ] || finish_ms 1 "[ERREUR] Sortie C SRC vide ($T_CAL)."
 
-    # Construire 2 datasets SRC dans l'ordre des IDs (réf MAX)
-    awk -F';' '
-        FNR==NR { src[$1]=$2; next }
-        { id=$0; print id ";" (id in src ? src[id] : 0) }
-    ' "$DAT" "$SMALL_IDS" > "$SMALL_DAT"
+        sort -t';' -k1,1r "$T_CAL" >> "$CSV"
+        csv_to_dat "$CSV" "$DAT"
 
-    awk -F';' '
-        FNR==NR { src[$1]=$2; next }
-        { id=$0; print id ";" (id in src ? src[id] : 0) }
-    ' "$DAT" "$BIG_IDS" > "$BIG_DAT"
+        awk -F';' '{print $1}' "$REF_SM" > "$ID_SM"
+        awk -F';' '{print $1}' "$REF_BG" > "$ID_BG"
 
-    # Sécurité : datasets non vides
-    if [ ! -s "$SMALL_DAT" ] || [ ! -s "$BIG_DAT" ]; then
-        finish_ms 1 "[ERREUR] Datasets SRC vides ($SMALL_DAT / $BIG_DAT)"
-    fi
+        awk -F';' 'FNR==NR { src[$1]=$2; next } { id=$0; print id ";" (id in src ? src[id] : 0) }' \
+            "$DAT" "$ID_SM" > "$D_SM"
+        awk -F';' 'FNR==NR { src[$1]=$2; next } { id=$0; print id ";" (id in src ? src[id] : 0) }' \
+            "$DAT" "$ID_BG" > "$D_BG"
 
-    # Génération des 2 graphiques (barres)
-    gnuplot <<EOF
+        [ -s "$D_SM" ] && [ -s "$D_BG" ] || finish_ms 1 "[ERREUR] Datasets SRC vides."
+
+        gnuplot <<EOF
 set terminal pngcairo size 1800,900 enhanced font "Arial,10"
 set datafile separator ";"
 set style fill solid 0.85 border -1
@@ -211,133 +192,93 @@ set boxwidth 0.75
 set grid ytics
 set key off
 set yrange [0:*]
-
 set xtics rotate by -90 center offset 0,-10
 set tmargin 2
 set bmargin 22
 
-# ---- 50 plus petites (réf MAX) ----
-set output "${PNG_SMALL}"
-set title "SRC — 50 plus petites usines (réf. capacité MAX)"
+set output "${P_SM}"
+set title "SRC — 50 plus petites usines"
 set xlabel "Usines" offset 0, 3
 set ylabel "Volume capté (M.m3/an)"
-plot "${SMALL_DAT}" using 0:(column(2)/1000.0):xticlabels(1) with boxes
+plot "${D_SM}" using 0:(column(2)/1000.0):xticlabels(1) with boxes lc rgb "#e74c3c"
 
-# ---- 10 plus grandes (réf MAX) ----
-set output "${PNG_BIG}"
-set title "SRC — 10 plus grandes usines (réf. capacité MAX)"
+set output "${P_BG}"
+set title "SRC — 10 plus grandes usines"
 set xlabel "Usines"
 set ylabel "Volume capté (M.m3/an)"
-plot "${BIG_DAT}" using 0:(column(2)/1000.0):xticlabels(1) with boxes
+plot "${D_BG}" using 0:(column(2)/1000.0):xticlabels(1) with boxes lc rgb "#e74c3c"
 EOF
 
-    if [ $? -ne 0 ]; then
-        finish_ms 1 "[ERREUR] gnuplot SRC a échoué"
+        [ $? -eq 0 ] || finish_ms 1 "[ERREUR] gnuplot SRC a échoué"
+        echo -e "${G}[INFO] PNG généré : $P_SM${N}"
+        echo -e "${G}[INFO] PNG généré : $P_BG${N}"
+        finish_ms 0
     fi
 
-    echo "[INFO] PNG généré : $PNG_SMALL"
-    echo "[INFO] PNG généré : $PNG_BIG"
+    ##############
+    # HISTO REAL # 
+    ##############
+    if [ "$OPT" = "real" ]; then
+        CSV="data/histo/histo_real.csv"
+        DAT="data/dat/histo_real.dat"
 
-    finish_ms 0
-fi
+        REF_SM="data/dat/histo_max_small50.dat"
+        REF_BG="data/dat/histo_max_big10.dat"
 
+        T_DIR="data/tmp"
+        mkdir -p "$T_DIR"
 
+        T_IN="${T_DIR}/real_input.tmp"
+        T_CAL="${T_DIR}/real_calc.tmp"
 
-##############################################
-# HISTO REAL (volume réellement traité) — réf MAX
-##############################################
-if [ "$MODE" = "real" ]; then
-    CSV="data/histo/histo_real.csv"
-    DAT="data/dat/histo_real.dat"
+        ID_SM="${T_DIR}/real_small50.ids"
+        ID_BG="${T_DIR}/real_big10.ids"
+        D_SM="${T_DIR}/histo_real_small50.dat"
+        D_BG="${T_DIR}/histo_real_big10.dat"
 
-    # Référence MAX (capacité max = référence petites/grandes)
-    MAX_SMALL="data/dat/histo_max_small50.dat"
-    MAX_BIG="data/dat/histo_max_big10.dat"
+        P_SM="data/histo/histo_real_50plus_petites.png"
+        P_BG="data/histo/histo_real_10plus_grandes.png"
 
-    TMP_DIR="data/tmp"
-    mkdir -p "$TMP_DIR"
+        BIN="exec/Wildwater"
 
-    REAL_INPUT="${TMP_DIR}/real_input.tmp"
-    REAL_CALC="${TMP_DIR}/real_calc.tmp"
+        echo -e "${Y}Histogramme REAL${N}"
 
-    SMALL_IDS="${TMP_DIR}/real_small50.ids"
-    BIG_IDS="${TMP_DIR}/real_big10.ids"
-    SMALL_DAT="${TMP_DIR}/histo_real_small50.dat"
-    BIG_DAT="${TMP_DIR}/histo_real_big10.dat"
-
-    PNG_SMALL="data/histo/histo_real_50plus_petites.png"
-    PNG_BIG="data/histo/histo_real_10plus_grandes.png"
-
-    # Exécutable C (compilé via make)
-    HISTO_REAL_EXEC="exec/histo_real"
-
-    echo "Histogramme REAL"
-
-    # Vérif fichiers de référence MAX (auto-génération si manquants)
-    if [ ! -f "$MAX_SMALL" ] || [ ! -f "$MAX_BIG" ]; then
-        echo "[WARN] Fichiers MAX manquants ($MAX_SMALL / $MAX_BIG)."
-        echo "[WARN] Lancement automatique : histo max"
-        bash "$0" "$INPUT" histo max
-
-        if [ ! -f "$MAX_SMALL" ] || [ ! -f "$MAX_BIG" ]; then
-            finish_ms 1 "[ERREUR] Impossible de générer les fichiers MAX ($MAX_SMALL / $MAX_BIG)."
+        if [ ! -f "$REF_SM" ] || [ ! -f "$REF_BG" ]; then
+            echo -e "${Y}[WARN] Fichiers MAX manquants → génération MAX${N}"
+            bash "$0" "$FILE" histo max
+            [ -f "$REF_SM" ] && [ -f "$REF_BG" ] || finish_ms 1 "[ERREUR] MAX introuvable après génération."
         fi
-    fi
 
-    # Compilation via make si l'exécutable n'existe pas (pas d'appel direct à gcc)
-    if [ ! -x "$HISTO_REAL_EXEC" ]; then
-        echo "[INFO] Compilation histo_real..."
-        make histo-real-bin || finish_ms 1 "[ERREUR] Compilation histo_real impossible"
-    fi
+        if [ ! -x "$BIN" ]; then
+            echo -e "${B}[INFO] Compilation Wildwater...${N}"
+            make || finish_ms 1 "[ERREUR] Compilation Wildwater impossible"
+        fi
 
-    echo "identifier;real_volume(k.m3.year-1)" > "$CSV"
+        echo "identifier;real_volume(k.m3.year-1)" > "$CSV"
 
-    # 1) Filtrage : on prépare l'entrée pour le C
-    # Format attendu par le C : ID_USINE;VOLUME;FUITE_PERCENT
-    awk -F';' '
-        $1=="-" && $3!="-" && $4!="-" && $5!="-" {
-            print $3 ";" $4 ";" $5
-        }
-    ' "$INPUT" > "$REAL_INPUT"
+        # entrée : ID;VOLUME;FUITE
+        awk -F';' '$1=="-" && $3!="-" && $4!="-" && $5!="-" { print $3 ";" $4 ";" $5 }' \
+            "$FILE" > "$T_IN"
+        [ -s "$T_IN" ] || finish_ms 1 "[ERREUR] T_IN vide : aucun flux source->usine."
 
-    if [ ! -s "$REAL_INPUT" ]; then
-        finish_ms 1 "[ERREUR] Aucun flux source->usine valide pour REAL (fichier $REAL_INPUT vide)."
-    fi
+        "$BIN" histo real "$T_IN" "$T_CAL" \
+            || finish_ms 1 "[ERREUR] histo real (C via main) a échoué"
+        [ -s "$T_CAL" ] || finish_ms 1 "[ERREUR] Sortie C REAL vide ($T_CAL)."
 
-    # 2) Calcul en C : agrégation par usine -> output: ID_USINE;SOMME_REAL
-    "$HISTO_REAL_EXEC" "$REAL_INPUT" "$REAL_CALC" || finish_ms 1 "[ERREUR] histo_real (C) a échoué"
+        sort -t';' -k1,1r "$T_CAL" >> "$CSV"
+        csv_to_dat "$CSV" "$DAT"
 
-    if [ ! -s "$REAL_CALC" ]; then
-        finish_ms 1 "[ERREUR] Sortie C REAL vide ($REAL_CALC)."
-    fi
+        awk -F';' '{print $1}' "$REF_SM" > "$ID_SM"
+        awk -F';' '{print $1}' "$REF_BG" > "$ID_BG"
 
-    # 3) Tri complet (consigne) : par identifiant inverse
-    sort -t';' -k1,1r "$REAL_CALC" >> "$CSV"
+        awk -F';' 'FNR==NR { real[$1]=$2; next } { id=$0; print id ";" (id in real ? real[id] : 0) }' \
+            "$DAT" "$ID_SM" > "$D_SM"
+        awk -F';' 'FNR==NR { real[$1]=$2; next } { id=$0; print id ";" (id in real ? real[id] : 0) }' \
+            "$DAT" "$ID_BG" > "$D_BG"
 
-    # 4) CSV -> DAT (sans en-tête)
-    csv_to_dat "$CSV" "$DAT"
+        [ -s "$D_SM" ] && [ -s "$D_BG" ] || finish_ms 1 "[ERREUR] Datasets REAL vides."
 
-    # 5) Construire les datasets dans l'ordre des IDs (réf MAX)
-    awk -F';' '{print $1}' "$MAX_SMALL" > "$SMALL_IDS"
-    awk -F';' '{print $1}' "$MAX_BIG"   > "$BIG_IDS"
-
-    awk -F';' '
-        FNR==NR { real[$1]=$2; next }
-        { id=$0; print id ";" (id in real ? real[id] : 0) }
-    ' "$DAT" "$SMALL_IDS" > "$SMALL_DAT"
-
-    awk -F';' '
-        FNR==NR { real[$1]=$2; next }
-        { id=$0; print id ";" (id in real ? real[id] : 0) }
-    ' "$DAT" "$BIG_IDS" > "$BIG_DAT"
-
-    # Sécurité : datasets non vides
-    if [ ! -s "$SMALL_DAT" ] || [ ! -s "$BIG_DAT" ]; then
-        finish_ms 1 "[ERREUR] Datasets REAL vides ($SMALL_DAT / $BIG_DAT)"
-    fi
-
-    # 6) PNG (barres) — unité en M.m3/an => /1000
-    gnuplot <<EOF
+        gnuplot <<EOF
 set terminal pngcairo size 1800,900 enhanced font "Arial,10"
 set datafile separator ";"
 set style fill solid 0.85 border -1
@@ -345,131 +286,90 @@ set boxwidth 0.75
 set grid ytics
 set key off
 set yrange [0:*]
-
 set xtics rotate by -90 center offset 0,-10
 set tmargin 2
 set bmargin 22
 
-# ---- 50 plus petites (réf MAX) ----
-set output "${PNG_SMALL}"
-set title "REAL — 50 plus petites usines (réf. capacité MAX)"
-set xlabel "Usines"
+set output "${P_SM}"
+set title "REAL — 50 plus petites usines"
+set xlabel "Usines" offset 0, 6
 set ylabel "Volume traité (M.m3/an)"
-plot "${SMALL_DAT}" using 0:(column(2)/1000.0):xticlabels(1) with boxes
+plot "${D_SM}" using 0:(column(2)/1000.0):xticlabels(1) with boxes lc rgb "#2ecc71"
 
-# ---- 10 plus grandes (réf MAX) ----
-set output "${PNG_BIG}"
-set title "REAL — 10 plus grandes usines (réf. capacité MAX)"
+set output "${P_BG}"
+set title "REAL — 10 plus grandes usines"
 set xlabel "Usines"
 set ylabel "Volume traité (M.m3/an)"
-plot "${BIG_DAT}" using 0:(column(2)/1000.0):xticlabels(1) with boxes
+plot "${D_BG}" using 0:(column(2)/1000.0):xticlabels(1) with boxes lc rgb "#2ecc71"
 EOF
 
-    if [ $? -ne 0 ]; then
-        finish_ms 1 "[ERREUR] gnuplot REAL a échoué"
+        [ $? -eq 0 ] || finish_ms 1 "[ERREUR] gnuplot REAL a échoué"
+        echo -e "${G}[INFO] PNG généré : $P_SM${N}"
+        echo -e "${G}[INFO] PNG généré : $P_BG${N}"
+        finish_ms 0
     fi
 
-    echo "[INFO] PNG généré : $PNG_SMALL"
-    echo "[INFO] PNG généré : $PNG_BIG"
+    ##############
+    # HISTO ALL # 
+    ##############
+    if [ "$OPT" = "all" ]; then
+        C_OUT="data/histo/histo_all.csv"
+        D_OUT="data/dat/histo_all.dat"
 
-    finish_ms 0
-fi
+        C_MAX="data/histo/histo_max.csv"
+        C_SRC="data/histo/histo_src.csv"
+        C_REA="data/histo/histo_real.csv"
 
+        REF_SM="data/dat/histo_max_small50.dat"
+        REF_BG="data/dat/histo_max_big10.dat"
 
+        T_DIR="data/tmp"
+        mkdir -p "$T_DIR"
 
-##############################################
-# HISTO ALL (BONUS) : histogramme cumulé
-# Couleurs / ordre (bas -> haut) :
-#   BLEU  = real
-#   ROUGE = source - real
-#   VERT  = max - source
-##############################################
-if [ "$MODE" = "all" ]; then
-    CSV_OUT="data/histo/histo_all.csv"
-    DAT_OUT="data/dat/histo_all.dat"
+        ID_SM="${T_DIR}/all_small50.ids"
+        ID_BG="${T_DIR}/all_big10.ids"
+        D_SM="${T_DIR}/histo_all_small50.dat"
+        D_BG="${T_DIR}/histo_all_big10.dat"
 
-    # On s'appuie sur les sorties déjà générées :
-    MAX_CSV="data/histo/histo_max.csv"
-    SRC_CSV="data/histo/histo_src.csv"
-    REAL_CSV="data/histo/histo_real.csv"
+        P_SM="data/histo/histo_all_50plus_petites.png"
+        P_BG="data/histo/histo_all_10plus_grandes.png"
 
-    # Référence (capacité max -> petites/grandes)
-    MAX_SMALL="data/dat/histo_max_small50.dat"
-    MAX_BIG="data/dat/histo_max_big10.dat"
+        BIN="exec/Wildwater"
 
-    TMP_DIR="data/tmp"
-    mkdir -p "$TMP_DIR"
+        echo -e "${Y}Histogramme ALL (bonus)${N}"
+        echo -e "${B}[INFO] Re-génération complète (MAX, SRC, REAL)${N}"
 
-    SMALL_IDS="${TMP_DIR}/all_small50.ids"
-    BIG_IDS="${TMP_DIR}/all_big10.ids"
-    SMALL_DAT="${TMP_DIR}/histo_all_small50.dat"
-    BIG_DAT="${TMP_DIR}/histo_all_big10.dat"
+        bash "$0" "$FILE" histo max  || finish_ms 1 "[ERREUR] histo max a échoué"
+        bash "$0" "$FILE" histo src  || finish_ms 1 "[ERREUR] histo src a échoué"
+        bash "$0" "$FILE" histo real || finish_ms 1 "[ERREUR] histo real a échoué"
 
-    PNG_SMALL="data/histo/histo_all_50plus_petites.png"
-    PNG_BIG="data/histo/histo_all_10plus_grandes.png"
+        [ -f "$C_MAX" ] && [ -f "$C_SRC" ] && [ -f "$C_REA" ] || finish_ms 1 "[ERREUR] Fichiers max/src/real introuvables."
+        [ -f "$REF_SM" ] && [ -f "$REF_BG" ] || finish_ms 1 "[ERREUR] Fichiers de référence MAX introuvables."
 
-    echo "Histogramme ALL (bonus)"
-    echo "[INFO] Re-génération complète (MAX, SRC, REAL) pour garantir la cohérence avec : $INPUT"
+        if [ ! -x "$BIN" ]; then
+            echo -e "${B}[INFO] Compilation Wildwater...${N}"
+            make || finish_ms 1 "[ERREUR] Compilation Wildwater impossible"
+        fi
 
-    # IMPORTANT : on régénère TOUJOURS tout avec le même INPUT
-    if ! bash "$0" "$INPUT" histo max; then
-        finish_ms 1 "[ERREUR] histo max a échoué"
-    fi
-    if ! bash "$0" "$INPUT" histo src; then
-        finish_ms 1 "[ERREUR] histo src a échoué"
-    fi
-    if ! bash "$0" "$INPUT" histo real; then
-        finish_ms 1 "[ERREUR] histo real a échoué"
-    fi
+        "$BIN" histo all "$C_MAX" "$C_SRC" "$C_REA" "$C_OUT" \
+            || finish_ms 1 "[ERREUR] histo_all (C via main) a échoué"
 
-    # Vérif présence des fichiers attendus
-    if [ ! -f "$MAX_CSV" ] || [ ! -f "$SRC_CSV" ] || [ ! -f "$REAL_CSV" ]; then
-        finish_ms 1 "[ERREUR] Fichiers max/src/real introuvables après génération."
-    fi
-    if [ ! -f "$MAX_SMALL" ] || [ ! -f "$MAX_BIG" ]; then
-        finish_ms 1 "[ERREUR] Fichiers de référence MAX introuvables ($MAX_SMALL / $MAX_BIG)."
-    fi
+        csv_to_dat "$C_OUT" "$D_OUT"
 
-    # Exécutable C histo_all
-    HISTO_ALL_EXEC="exec/histo_all"
-    if [ ! -x "$HISTO_ALL_EXEC" ]; then
-        echo "[INFO] Compilation histo_all..."
-        make histo-all-bin || finish_ms 1 "[ERREUR] compilation histo_all échouée"
-    fi
+        awk -F';' '{print $1}' "$REF_SM" > "$ID_SM"
+        awk -F';' '{print $1}' "$REF_BG" > "$ID_BG"
 
-    # Appel C : construit histo_all.csv
-    # (ton C doit produire : id ; (max-src) ; (src-real) ; real)
-    "$HISTO_ALL_EXEC" "$MAX_CSV" "$SRC_CSV" "$REAL_CSV" "$CSV_OUT" || finish_ms 1 "[ERREUR] histo_all (C) a échoué"
+        awk -F';' 'FNR==NR { v[$1]=$2";"$3";"$4; next } { id=$0; if (id in v) print id";"v[id]; else print id";0;0;0" }' \
+            "$D_OUT" "$ID_SM" > "$D_SM"
+        awk -F';' 'FNR==NR { v[$1]=$2";"$3";"$4; next } { id=$0; if (id in v) print id";"v[id]; else print id";0;0;0" }' \
+            "$D_OUT" "$ID_BG" > "$D_BG"
 
-    # CSV -> DAT (sans en-tête)
-    csv_to_dat "$CSV_OUT" "$DAT_OUT"
+        [ -s "$D_SM" ] && [ -s "$D_BG" ] || finish_ms 1 "[ERREUR] Datasets ALL vides."
 
-    # IDs des 50 petites / 10 grandes (réf MAX)
-    awk -F';' '{print $1}' "$MAX_SMALL" > "$SMALL_IDS"
-    awk -F';' '{print $1}' "$MAX_BIG"   > "$BIG_IDS"
-
-    # Construire les 2 datasets ALL dans l'ordre des IDs (réf MAX)
-    # DAT_OUT format : id;max-src;src-real;real
-    awk -F';' '
-        FNR==NR { v[$1]=$2";"$3";"$4; next }
-        { id=$0; if (id in v) print id";"v[id]; else print id";0;0;0" }
-    ' "$DAT_OUT" "$SMALL_IDS" > "$SMALL_DAT"
-
-    awk -F';' '
-        FNR==NR { v[$1]=$2";"$3";"$4; next }
-        { id=$0; if (id in v) print id";"v[id]; else print id";0;0;0" }
-    ' "$DAT_OUT" "$BIG_IDS" > "$BIG_DAT"
-
-    # Sécurité : datasets non vides
-    if [ ! -s "$SMALL_DAT" ] || [ ! -s "$BIG_DAT" ]; then
-        finish_ms 1 "[ERREUR] Datasets ALL vides ($SMALL_DAT / $BIG_DAT)"
-    fi
-
-    # Gnuplot : histogramme empilé (ordre bas->haut = bleu, rouge, vert)
-    gnuplot <<EOF
+        gnuplot <<EOF
 set terminal pngcairo size 1800,900 enhanced font "Arial,10"
 set datafile separator ";"
-set key top right
+unset key
 set grid ytics
 set yrange [0:*]
 
@@ -478,85 +378,102 @@ set style histogram rowstacked
 set style fill solid 0.85 border -1
 set boxwidth 0.75
 
-# styles couleurs
-set style line 1 lc rgb "#3498db"  # BLEU (real) -> bas
-set style line 2 lc rgb "#e74c3c"  # ROUGE (src-real) -> milieu
-set style line 3 lc rgb "#2ecc71"  # VERT (max-src) -> haut
+set style line 1 lc rgb "#3498db"
+set style line 2 lc rgb "#e74c3c"
+set style line 3 lc rgb "#2ecc71"
 
 set xtics rotate by -90 center offset 0,-10
 set tmargin 2
 set bmargin 22
 
-# ---- 50 plus petites (réf MAX) ----
-set output "${PNG_SMALL}"
-set title "ALL — 50 plus petites usines (réf. capacité MAX)"
-set xlabel "Usines"
+set output "${P_SM}"
+set title "ALL — 50 plus petites usines"
+set xlabel "Usines" offset 0, 6
 set ylabel "Volumes (M.m3/an)"
-plot "${SMALL_DAT}" using (column(4)/1000.0):xticlabels(1) title "real" ls 1, \
-     "" using (column(3)/1000.0) title "source - real" ls 2, \
-     "" using (column(2)/1000.0) title "max - source" ls 3
+plot "${D_SM}" using (column(4)/1000.0):xticlabels(1) ls 1, \
+     "" using (column(3)/1000.0) ls 2, \
+     "" using (column(2)/1000.0) ls 3
 
-# ---- 10 plus grandes (réf MAX) ----
-set output "${PNG_BIG}"
-set title "ALL — 10 plus grandes usines (réf. capacité MAX)"
+set output "${P_BG}"
+set title "ALL — 10 plus grandes usines"
 set xlabel "Usines"
 set ylabel "Volumes (M.m3/an)"
-plot "${BIG_DAT}" using (column(4)/1000.0):xticlabels(1) title "real" ls 1, \
-     "" using (column(3)/1000.0) title "source - real" ls 2, \
-     "" using (column(2)/1000.0) title "max - source" ls 3
+plot "${D_BG}" using (column(4)/1000.0):xticlabels(1) ls 1, \
+     "" using (column(3)/1000.0) ls 2, \
+     "" using (column(2)/1000.0) ls 3
 
 unset output
 EOF
 
-    if [ $? -ne 0 ]; then
-        finish_ms 1 "[ERREUR] gnuplot ALL a échoué"
+        [ $? -eq 0 ] || finish_ms 1 "[ERREUR] gnuplot ALL a échoué"
+        echo -e "${G}[INFO] PNG généré : $P_SM${N}"
+        echo -e "${G}[INFO] PNG généré : $P_BG${N}"
+        finish_ms 0
     fi
 
-    echo "[INFO] PNG généré : $PNG_SMALL"
-    echo "[INFO] PNG généré : $PNG_BIG"
-    finish_ms 0
-fi
+    finish_ms 1 "Erreur : mode histo inconnu"
+    ;;
 
+###################
+# ==== LEAKS ==== #
+###################
 
-fi   # FIN du if CMD=histo
+leaks)
+    # Appel : script.sh data.csv leaks "<ID_USINE>"
+    TARGET="$OPT"
 
-##############################################
-# ================== LEAKS ===================
-##############################################
-if [ "$CMD" = "leaks" ]; then
+    T_DIR="data/tmp"
+    mkdir -p "$T_DIR"
 
-    if [ $# -ne 3 ]; then
-        finish_ms 1 "Usage : $0 data.csv leaks <ID_USINE>"
-    fi
+    T_SRC="${T_DIR}/leaks_sources.tmp"
+    T_EDG="${T_DIR}/leaks_edges.tmp"
+    T_OUT="${T_DIR}/leaks_out.tmp"
 
-    PLANT_ID="$MODE"
+    L_DIR="data/leaks"
+    mkdir -p "$L_DIR"
+    L_DAT="${L_DIR}/leaks.dat"
 
-    OUT_CSV="data/leaks/leaks.csv"
-    HISTORY_DAT="data/leaks/leaks_history.dat"
+    BIN="exec/Wildwater"
 
-    EXEC="./exec/Wildwater"
+    echo -e "${Y}LEAKS pour : $TARGET${N}"
 
-    if [ ! -x "$EXEC" ]; then
-        echo "[INFO] Compilation Wildwater..."
+    if [ ! -x "$BIN" ]; then
+        echo -e "${B}[INFO] Compilation Wildwater...${N}"
         make || finish_ms 1 "[ERREUR] Compilation impossible"
     fi
 
-    echo "[INFO] Calcul des fuites pour : $PLANT_ID"
+    # Entrée : volume + fuite
+    awk -F';' -v ID="$TARGET" '
+        $1=="-" && $3==ID && $4!="-" && $5!="-" { print $3 ";" $4 ";" $5 }
+    ' "$FILE" > "$T_SRC"
 
-    "$EXEC" leaks "$INPUT" "$PLANT_ID" "$OUT_CSV" "$HISTORY_DAT"
-    RC=$?
+    # PARENT ENFANT et FUITE
+    awk -F';' '
+        $2!="-" && $3!="-" && $5!="-" { print $2 ";" $3 ";" $5 }
+    ' "$FILE" > "$T_EDG"
 
-    if [ $RC -ne 0 ]; then
-        finish_ms $RC "[ERREUR] Échec du calcul des fuites"
+    # Appel C
+    "$BIN" leaks "$TARGET" "$T_SRC" "$T_EDG" "$T_OUT" \
+        || finish_ms 1 "[ERREUR] leaks (C) a échoué"
+
+    [ -s "$T_OUT" ] || finish_ms 1 "[ERREUR] sortie leaks vide ($T_OUT)"
+
+    VAL="$(cat "$T_OUT")"
+
+    if [ ! -f "$L_DAT" ]; then
+        echo "identifier;Leak volume (M.m3.year-1)" > "$L_DAT"
     fi
+    echo "$TARGET;$VAL" >> "$L_DAT"
 
-    echo "[INFO] Résultat écrit dans $OUT_CSV"
-    echo "[INFO] Historique mis à jour : $HISTORY_DAT"
-
+    echo -e "${G}[INFO] Leak volume = $VAL M.m3/year${N}"
+    echo -e "${B}[INFO] Historique : $L_DAT${N}"
     finish_ms 0
-fi
+    ;;
 
-##############################################
-# Commande inconnue
-##############################################
-finish_ms 1 "Erreur : commande inconnue"
+###########################
+# == COMMANDE INCONNUE == #
+###########################
+*)
+    finish_ms 1 "Erreur : commande inconnue"
+    ;;
+esac

@@ -1,49 +1,40 @@
-#define _POSIX_C_SOURCE 200809L  // pour getline()
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "histo_src.h"
+#include "avl.h"
 
-typedef struct {
-    char *id;      // identifiant usine (alloué dynamiquement)
-    double somme;  // somme des volumes
-} Usine;
-
-
-static char *suppr_espaces(char *s) {
+static char *trim(char *s) {
     if (!s) return s;
-
-    // Supprime les espaces / tabulations / retours au début
     while (*s == ' ' || *s == '\t' || *s == '\r' || *s == '\n') s++;
-
-    // la meme mais à la fin
     size_t n = strlen(s);
     while (n > 0) {
         char c = s[n - 1];
         if (c == ' ' || c == '\t' || c == '\r' || c == '\n') {
             s[n - 1] = '\0';
             n--;
-        } else {
-            break;
-        }
+        } else break;
     }
     return s;
 }
 
-
-static int trouver_usine(Usine *tab, int nb, const char *id) {
-    for (int i = 0; i < nb; i++) {
-        if (strcmp(tab[i].id, id) == 0) return i;
-    }
-    return -1;
+static usine_t *usine_nouvelle(const char *id) {
+    usine_t *u = malloc(sizeof(*u));
+    if (!u) return NULL;
+    u->id = malloc(strlen(id) + 1);
+    if (!u->id) { free(u); return NULL; }
+    strcpy(u->id, id);
+    u->max = 0.0;
+    u->src = 0.0;
+    u->real = 0.0;
+    return u;
 }
 
-/* Parse une ligne "id;volume"
-   - met id_out (pointeur dans la ligne) et vol_out
-   - retourne 1 si OK, 0 sinon */
 static int parser_ligne(char *ligne, char **id_out, double *vol_out) {
+    if (!ligne) return 0;
+    if (strncmp(ligne, "identifier;", 11) == 0) return 0;
+
     char *sep = strchr(ligne, ';');
     if (!sep) return 0;
 
@@ -55,37 +46,23 @@ static int parser_ligne(char *ligne, char **id_out, double *vol_out) {
     if (voltxt[0] == '\0') return 0;
     if (strcmp(voltxt, "-") == 0) return 0;
 
-    // conversion double simple + vérif minimale
     char *fin = NULL;
     double v = strtod(voltxt, &fin);
-    if (fin == voltxt) return 0;  // rien converti
+    if (fin == voltxt) return 0;
 
-    // accepter espaces en fin
     while (*fin == ' ' || *fin == '\t' || *fin == '\r' || *fin == '\n') fin++;
-    if (*fin != '\0') return 0;   // caractères non numériques derrière
+    if (*fin != '\0') return 0;
 
     *id_out = id;
     *vol_out = v;
     return 1;
 }
 
-int calculer_histo_src(const char *chemin_entree, const char *chemin_sortie) {
+int generer_histo_src(const char *chemin_entree, const char *chemin_sortie) {
     FILE *f = fopen(chemin_entree, "r");
-    if (!f) {
-        perror("histo_src: fopen entree");
-        return 1;
-    }
+    if (!f) { perror("histo_src: fopen entree"); return 1; }
 
-    int capacite = 256;
-    int nb = 0;
-    Usine *usines = malloc(sizeof(Usine) * capacite);
-    if (!usines) {
-        fclose(f);
-        fprintf(stderr, "histo_src: malloc impossible\n");
-        return 2;
-    }
-
-    // lecture sans taille max
+    noeud_avl_t *racine = NULL;
     char *ligne = NULL;
     size_t taille = 0;
 
@@ -95,73 +72,28 @@ int calculer_histo_src(const char *chemin_entree, const char *chemin_sortie) {
 
         char *id = NULL;
         double volume = 0.0;
+        if (!parser_ligne(l, &id, &volume)) continue;
 
-        if (!parser_ligne(l, &id, &volume)) {
-            continue;
+        usine_t *u = avl_trouver(racine, id);
+        if (!u) {
+            u = usine_nouvelle(id);
+            if (!u) { free(ligne); fclose(f); avl_liberer(racine); return 2; }
+            racine = avl_inserer(racine, u);
+            if (!racine) { free(ligne); fclose(f); free(u->id); free(u); return 2; }
+            u = avl_trouver(racine, id);
         }
-
-        int idx = trouver_usine(usines, nb, id);
-        if (idx >= 0) {
-            usines[idx].somme += volume;
-        } else {
-            if (nb >= capacite) {
-                capacite *= 2;
-                Usine *tmp = realloc(usines, sizeof(Usine) * capacite);
-                if (!tmp) {
-                    fclose(f);
-                    free(ligne);
-                    // libérer les ids déjà alloués
-                    for (int i = 0; i < nb; i++) free(usines[i].id);
-                    free(usines);
-                    fprintf(stderr, "histo_src: realloc impossible\n");
-                    return 3;
-                }
-                usines = tmp;
-            }
-
-            usines[nb].id = malloc(strlen(id) + 1);
-            if (!usines[nb].id) {
-                fclose(f);
-                free(ligne);
-                for (int i = 0; i < nb; i++) free(usines[i].id);
-                free(usines);
-                fprintf(stderr, "histo_src: malloc id impossible\n");
-                return 4;
-            }
-            strcpy(usines[nb].id, id);
-            usines[nb].somme = volume;
-            nb++;
-        }
+        if (u) u->src += volume;
     }
 
-    fclose(f);
     free(ligne);
+    fclose(f);
 
     FILE *out = fopen(chemin_sortie, "w");
-    if (!out) {
-        perror("histo_src: fopen sortie");
-        for (int i = 0; i < nb; i++) free(usines[i].id);
-        free(usines);
-        return 5;
-    }
+    if (!out) { perror("histo_src: fopen sortie"); avl_liberer(racine); return 5; }
 
-    // écriture non triée (tri fait côté shell)
-    for (int i = 0; i < nb; i++) {
-        fprintf(out, "%s;%.10g\n", usines[i].id, usines[i].somme);
-    }
-
+    avl_ecrire(racine, out, 1);
     fclose(out);
 
-    for (int i = 0; i < nb; i++) free(usines[i].id);
-    free(usines);
-
+    avl_liberer(racine);
     return 0;
-}
-
-int main(int argc, char **argv) {
-    if (argc != 3) {
-        fprintf(stderr, "Usage: %s <entree_tmp> <sortie_tmp>\n", argv[0]);
-        return 1;
-    }
-    return calculer_histo_src(argv[1], argv[2]);
 }

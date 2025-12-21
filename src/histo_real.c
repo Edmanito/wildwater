@@ -1,61 +1,56 @@
-#define _POSIX_C_SOURCE 200809L
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <ctype.h>
 
 #include "histo_real.h"
+#include "avl.h"
 
-typedef struct {
-    char id[256];
-    double somme_real;
-} Usine;
+static int est_espace(char c) {
+    return (c == ' '  || c == '\t' || c == '\n' ||
+            c == '\r' || c == '\v' || c == '\f');
+}
 
-/* Supprime espaces/tab/retours début+fin, renvoie un pointeur dans la chaîne */
 static char *suppr_espaces(char *s) {
     if (!s) return s;
-
-    while (*s && isspace((unsigned char)*s)) s++;
-
+    while (*s && est_espace(*s)) s++;
     size_t n = strlen(s);
-    while (n > 0 && isspace((unsigned char)s[n - 1])) {
-        s[n - 1] = '\0';
-        n--;
-    }
+    while (n > 0 && est_espace(s[n - 1])) { s[n - 1] = '\0'; n--; }
     return s;
 }
 
-static int trouver_usine(Usine *tab, int nb, const char *id) {
-    for (int i = 0; i < nb; i++) {
-        if (strcmp(tab[i].id, id) == 0) return i;
-    }
-    return -1;
+static usine_t *usine_nouvelle(const char *id) {
+    usine_t *u = malloc(sizeof(*u));
+    if (!u) return NULL;
+    u->id = malloc(strlen(id) + 1);
+    if (!u->id) { free(u); return NULL; }
+    strcpy(u->id, id);
+    u->max = 0.0;
+    u->src = 0.0;
+    u->real = 0.0;
+    return u;
 }
 
-/* Convertit un texte en double, renvoie 1 si OK sinon 0 */
 static int lire_double(const char *txt, double *out) {
     if (!txt || txt[0] == '\0') return 0;
     if (strcmp(txt, "-") == 0) return 0;
 
     char *fin = NULL;
     double v = strtod(txt, &fin);
+    if (fin == txt) return 0;
 
-    if (fin == txt) return 0; // rien lu
-
-    while (*fin && isspace((unsigned char)*fin)) fin++;
-    if (*fin != '\0') return 0; // texte “sale” derrière
+    while (*fin && est_espace(*fin)) fin++;
+    if (*fin != '\0') return 0;
 
     *out = v;
     return 1;
 }
 
-/*
- * Parse une ligne "ID;VOLUME;FUITE"
- * Remplit id_out, volume_out, fuite_out si OK.
- */
 static int parser_ligne(char *ligne, char *id_out, size_t taille_id,
-                        double *volume_out, double *fuite_out) {
+                        double *volume_out, double *fuite_out)
+{
+    if (!ligne) return 0;
+    if (strncmp(ligne, "identifier;", 11) == 0) return 0;
+
     char *p1 = strchr(ligne, ';');
     if (!p1) return 0;
     *p1 = '\0';
@@ -75,7 +70,6 @@ static int parser_ligne(char *ligne, char *id_out, size_t taille_id,
     if (!lire_double(txt_vol, &volume)) return 0;
     if (!lire_double(txt_fuite, &fuite)) return 0;
 
-    /* borne la fuite entre 0 et 100 (sécurité simple) */
     if (fuite < 0.0) fuite = 0.0;
     if (fuite > 100.0) fuite = 100.0;
 
@@ -89,20 +83,9 @@ static int parser_ligne(char *ligne, char *id_out, size_t taille_id,
 
 int calculer_histo_real(const char *chemin_entree, const char *chemin_sortie) {
     FILE *f = fopen(chemin_entree, "r");
-    if (!f) {
-        perror("histo_real: fopen entree");
-        return 1;
-    }
+    if (!f) { perror("histo_real: fopen entree"); return 1; }
 
-    int capacite = 1024;
-    int nb = 0;
-    Usine *usines = malloc(sizeof(Usine) * capacite);
-    if (!usines) {
-        fclose(f);
-        fprintf(stderr, "histo_real: malloc impossible\n");
-        return 2;
-    }
-
+    noeud_avl_t *racine = NULL;
     char *ligne = NULL;
     size_t taille = 0;
 
@@ -114,60 +97,30 @@ int calculer_histo_real(const char *chemin_entree, const char *chemin_sortie) {
         double volume = 0.0;
         double fuite = 0.0;
 
-        if (!parser_ligne(l, id, sizeof(id), &volume, &fuite)) {
-            continue;
-        }
+        if (!parser_ligne(l, id, sizeof(id), &volume, &fuite)) continue;
 
         double volume_reel = volume * (1.0 - fuite / 100.0);
 
-        int idx = trouver_usine(usines, nb, id);
-        if (idx >= 0) {
-            usines[idx].somme_real += volume_reel;
-        } else {
-            if (nb >= capacite) {
-                capacite *= 2;
-                Usine *tmp = realloc(usines, sizeof(Usine) * capacite);
-                if (!tmp) {
-                    free(ligne);
-                    fclose(f);
-                    free(usines);
-                    fprintf(stderr, "histo_real: realloc impossible\n");
-                    return 3;
-                }
-                usines = tmp;
-            }
-
-            strncpy(usines[nb].id, id, sizeof(usines[nb].id) - 1);
-            usines[nb].id[sizeof(usines[nb].id) - 1] = '\0';
-            usines[nb].somme_real = volume_reel;
-            nb++;
+        usine_t *u = avl_trouver(racine, id);
+        if (!u) {
+            u = usine_nouvelle(id);
+            if (!u) { free(ligne); fclose(f); avl_liberer(racine); return 2; }
+            racine = avl_inserer(racine, u);
+            if (!racine) { free(ligne); fclose(f); free(u->id); free(u); return 2; }
+            u = avl_trouver(racine, id);
         }
+        if (u) u->real += volume_reel;
     }
 
     free(ligne);
     fclose(f);
 
     FILE *out = fopen(chemin_sortie, "w");
-    if (!out) {
-        perror("histo_real: fopen sortie");
-        free(usines);
-        return 4;
-    }
+    if (!out) { perror("histo_real: fopen sortie"); avl_liberer(racine); return 4; }
 
-    /* écriture non triée (tri côté shell) */
-    for (int i = 0; i < nb; i++) {
-        fprintf(out, "%s;%.10g\n", usines[i].id, usines[i].somme_real);
-    }
-
+    avl_ecrire(racine, out, 2);
     fclose(out);
-    free(usines);
-    return 0;
-}
 
-int main(int argc, char **argv) {
-    if (argc != 3) {
-        fprintf(stderr, "Usage: %s <entree_tmp> <sortie_tmp>\n", argv[0]);
-        return 1;
-    }
-    return calculer_histo_real(argv[1], argv[2]);
+    avl_liberer(racine);
+    return 0;
 }
