@@ -1,32 +1,24 @@
-#include "arbre.h"
+#include "../include/arbre.h"
 
-//Racine globale de l'AVL
+//racine
 static Noeud* racine_avl = NULL;
 
+//fonctions
 
-//Fonctions 
-static int max(int a, int b) {
-    return (a > b) ? a : b;
-}
+static int max(int a, int b) { return (a > b) ? a : b; }
+static int hauteur(Noeud* n) { return n ? n->hauteur : 0; }
 
-static int hauteur(Noeud* n) {
-    return n ? n->hauteur : 0;
-}
-
-static Noeud* nouveau_noeud(char* id) {
+static Noeud* nouveau_noeud(const char* id) {
     Noeud* n = calloc(1, sizeof(Noeud));
-    if (!n) {
-        fprintf(stderr, "Erreur fatale : allocation mémoire échouée pour le noeud.\n");
+    if(!n) {
+        fprintf(stderr, "Erreur allocation mémoire\n");
         exit(1);
     }
-    //Copie sécurisée
     strncpy(n->id, id, 127);
-    n->id[127] = '\0'; 
+    n->id[127] = '\0';
     n->hauteur = 1;
     return n;
 }
-
-//Rotations AVL
 
 static Noeud* rotation_droite(Noeud* y) {
     Noeud* x = y->gauche;
@@ -59,15 +51,14 @@ static int obtenir_equilibre(Noeud* n) {
     return hauteur(n->gauche) - hauteur(n->droite);
 }
 
-
-static Noeud* inserer_avl(Noeud* noeud, char* id, Noeud** resultat) {
+static Noeud* inserer_avl(Noeud* noeud, const char* id, Noeud** resultat) {
+  
     if (noeud == NULL) {
         *resultat = nouveau_noeud(id);
         return *resultat;
     }
 
     int cmp = strcmp(id, noeud->id);
-
     if (cmp < 0)
         noeud->gauche = inserer_avl(noeud->gauche, id, resultat);
     else if (cmp > 0)
@@ -101,22 +92,18 @@ static Noeud* inserer_avl(Noeud* noeud, char* id, Noeud** resultat) {
 }
 
 
-Noeud* obtenir_noeud(char* id) {
+Noeud* obtenir_noeud(const char* id) {
     Noeud* res = NULL;
     racine_avl = inserer_avl(racine_avl, id, &res);
     return res;
 }
 
-void ajouter_arete(char* id_parent, char* id_enfant, double fuite) {
-    
+void ajouter_arete(const char* id_parent, const char* id_enfant, double fuite) {
     Noeud* parent = obtenir_noeud(id_parent);
     Noeud* enfant = obtenir_noeud(id_enfant);
 
     Arete* nouvelle_arete = malloc(sizeof(Arete));
-    if (!nouvelle_arete) {
-        fprintf(stderr, "Erreur fatale : allocation mémoire arête.\n");
-        exit(1);
-    }
+    if (!nouvelle_arete) exit(1);
 
     nouvelle_arete->enfant = enfant;
     nouvelle_arete->pourcentage_fuite = fuite;
@@ -125,21 +112,19 @@ void ajouter_arete(char* id_parent, char* id_enfant, double fuite) {
     parent->liste_enfants = nouvelle_arete;
 }
 
-void ajouter_volume_source(char* id_usine, double volume) {
+void ajouter_volume_source(const char* id_usine, double volume) {
     Noeud* n = obtenir_noeud(id_usine);
     n->volume_eau += volume;
 }
 
-//Libère memoire
+//free memoire
 
-static void liberer_arbre_recursif(Noeud* n) {
+static void liberer_arbre(Noeud* n) {
     if (!n) return;
 
-    //sous-arbres
-    liberer_arbre_recursif(n->gauche);
-    liberer_arbre_recursif(n->droite);
+    liberer_arbre(n->gauche);
+    liberer_arbre(n->droite);
 
-    //arêtes du graphe
     Arete* courant = n->liste_enfants;
     while (courant) {
         Arete* temp = courant;
@@ -147,12 +132,10 @@ static void liberer_arbre_recursif(Noeud* n) {
         free(temp);
     }
 
-    
-    //Libère tout le noeud
     free(n);
 }
 
 void liberer_tout(void) {
-    liberer_arbre_recursif(racine_avl);
+    liberer_arbre(racine_avl);
     racine_avl = NULL;
 }

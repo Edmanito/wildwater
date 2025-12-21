@@ -7,7 +7,7 @@
 #include "histo_all.h"
 #include "leaks.h"
 
-
+//Fonction
 static void usage(const char *prog) {
     fprintf(stderr,
         "Usage:\n"
@@ -16,23 +16,25 @@ static void usage(const char *prog) {
         "    %s histo real <entree_tmp> <sortie_tmp>\n"
         "    %s histo all  <histo_max.csv> <histo_src.csv> <histo_real.csv> <histo_all.csv>\n"
         "\n"
-        "  Leaks (Mode Pipeline):\n"
-        "    %s leaks <fichier_sortie.dat>\n"
-        "    (Les données et la commande 'LEAK;ID' sont lues depuis l'entrée standard STDIN)\n"
-        "    (Le résultat est écrit dans <fichier_sortie.dat> après vérification des doublons)\n"
+        "  Leaks (mode fichiers tmp):\n"
+        "    %s leaks <ID_USINE> <sources_tmp> <edges_tmp> <out_tmp>\n"
+        "    (sources_tmp : ID;VOLUME_k;POURCENTAGE)\n"
+        "    (edges_tmp   : AMONT;AVAL;POURCENTAGE_FUITE)\n"
+        "    (out_tmp     : écrit une valeur unique en M.m3/an, ou -1)\n"
         "\n",
         prog, prog, prog, prog
     );
 }
 
 int main(int argc, char **argv) {
-    //verifie au moins le nom du programme
     if (argc < 2) {
         usage(argv[0]);
         return 1;
     }
 
-    //histogramme
+    // HISTOGRAMMES
+    // ===================
+
     if (strcmp(argv[1], "histo") == 0) {
         if (argc < 3) {
             usage(argv[0]);
@@ -57,27 +59,23 @@ int main(int argc, char **argv) {
             return generer_histo_all(argv[3], argv[4], argv[5], argv[6]);
         }
 
-        //Sinon 
         usage(argv[0]);
         return 2;
     }
 
-   
-    //Leaks
+    // LEAKS 
+    // =========================
     if (strcmp(argv[1], "leaks") == 0) {
         
-        if (argc < 3) {
-            fprintf(stderr, "Erreur: Chemin du fichier de sortie manquant pour leaks.\n");
+        if (argc != 6) {
+            fprintf(stderr, "Erreur: leaks attend 4 arguments.\n");
             usage(argv[0]);
             return 1;
         }
 
-        traiter_fuites_stdin(argv[2]);
-        
-        return 0; 
+        return calculer_leaks_usine(argv[2], argv[3], argv[4], argv[5]);
     }
 
-    //Sinon
     usage(argv[0]);
     return 2;
 }

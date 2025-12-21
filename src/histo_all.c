@@ -1,113 +1,112 @@
-#define _POSIX_C_SOURCE 200809L
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "histo_all.h"
 
-//Nettoie fin de ligne
-static void enlever_retour_ligne(char *chaine) {
-    if (!chaine) return;
-    chaine[strcspn(chaine, "\r\n")] = '\0';
+//supprime le \n et le \r 
+static void enlever_retour_ligne(char *s) {
+    if (!s) return;
+    s[strcspn(s, "\r\n")] = '\0';
 }
 
-//Lire ligne id et valeur
-static int lire_ligne_val(FILE *flux, char **tampon, size_t *taille,
-                          char *id_sortie, size_t taille_id, double *valeur_sortie)
+static int lire_ligne_val(FILE *f, char **ligne, size_t *cap,
+                          char *id, size_t idsz, double *val)
 {
     while (1) {
-        if (getline(tampon, taille, flux) == -1) return 0;
+        if (getline(ligne, cap, f) == -1) return 0; 
 
-        enlever_retour_ligne(*tampon);
+        enlever_retour_ligne(*ligne);
 
-        if ((*tampon)[0] == '\0') continue;
-        if (strncmp(*tampon, "identifier;", 11) == 0) continue;
+        if ((*ligne)[0] == '\0') continue;
+        if (strncmp(*ligne, "identifier;", 11) == 0) continue;
 
-        char *separateur = strchr(*tampon, ';');
-        if (!separateur) continue;
+        char *sep = strchr(*ligne, ';');
+        if (!sep) continue;
 
-        *separateur = '\0';
-        char *ptr_id = *tampon;
-        char *ptr_val = separateur + 1;
+        *sep = '\0';
+        char *id_txt = *ligne;
+        char *val_txt = sep + 1;
 
-        strncpy(id_sortie, ptr_id, taille_id - 1);
-        id_sortie[taille_id - 1] = '\0';
+        strncpy(id, id_txt, idsz - 1);
+        id[idsz - 1] = '\0';
 
-        char *fin_ptr = NULL;
-        double x = strtod(ptr_val, &fin_ptr);
-        if (fin_ptr == ptr_val) continue;
+        char *fin = NULL;
+        double x = strtod(val_txt, &fin);
+        if (fin == val_txt) continue;
 
-        *valeur_sortie = x;
+        *val = x;
         return 1;
     }
 }
 
-//Histo
-int generer_histo_all(const char *chemin_max,
-                      const char *chemin_src,
-                      const char *chemin_real,
-                      const char *chemin_sortie)
-{
-    FILE *flux_max  = fopen(chemin_max, "r");
-    FILE *flux_src  = fopen(chemin_src, "r");
-    FILE *flux_real = fopen(chemin_real, "r");
-    FILE *flux_sortie  = fopen(chemin_sortie, "w");
 
-    if (!flux_max || !flux_src || !flux_real || !flux_sortie) {
-        if (flux_max) fclose(flux_max);
-        if (flux_src) fclose(flux_src);
-        if (flux_real) fclose(flux_real);
-        if (flux_sortie) fclose(flux_sortie);
-        fprintf(stderr, "Erreur ouverture fichiers\n");
+int generer_histo_all(const char *csv_max,
+                      const char *csv_src,
+                      const char *csv_real,
+                      const char *csv_out)
+{
+    FILE *fmax  = fopen(csv_max, "r");
+    FILE *fsrc  = fopen(csv_src, "r");
+    FILE *freal = fopen(csv_real, "r");
+    FILE *fout  = fopen(csv_out, "w");
+
+    if (!fmax || !fsrc || !freal || !fout) {
+        if (fmax) fclose(fmax);
+        if (fsrc) fclose(fsrc);
+        if (freal) fclose(freal);
+        if (fout) fclose(fout);
+        fprintf(stderr, "[ERREUR] Ouverture fichiers histo_all impossible\n");
         return 2;
     }
 
-    fprintf(flux_sortie, "identifier;green;red;blue\n");
+    fprintf(fout, "identifier;green;red;blue\n");
 
-    char *tampon_src = NULL, *tampon_real = NULL, *tampon_max = NULL;
-    size_t taille_src = 0, taille_real = 0, taille_max = 0;
+    char *ligne_src = NULL, *ligne_real = NULL, *ligne_max = NULL;
+    size_t cap_src = 0, cap_real = 0, cap_max = 0;
 
     char id_src[1024]  = {0};
     char id_real[1024] = {0};
-    double val_src = 0.0, val_real = 0.0;
+    double v_src = 0.0, v_real = 0.0;
 
-    int res_src  = lire_ligne_val(flux_src,  &tampon_src,  &taille_src,  id_src,  sizeof(id_src),  &val_src);
-    int res_real = lire_ligne_val(flux_real, &tampon_real, &taille_real, id_real, sizeof(id_real), &val_real);
+    int a_src  = lire_ligne_val(fsrc,  &ligne_src,  &cap_src,  id_src,  sizeof(id_src),  &v_src);
+    int a_real = lire_ligne_val(freal, &ligne_real, &cap_real, id_real, sizeof(id_real), &v_real);
 
     char id_max[1024];
-    double val_max = 0.0;
+    double v_max = 0.0;
 
-    while (lire_ligne_val(flux_max, &tampon_max, &taille_max, id_max, sizeof(id_max), &val_max)) {
+    while (lire_ligne_val(fmax, &ligne_max, &cap_max, id_max, sizeof(id_max), &v_max)) {
 
-        while (res_src && strcmp(id_src, id_max) > 0) {
-            res_src = lire_ligne_val(flux_src, &tampon_src, &taille_src, id_src, sizeof(id_src), &val_src);
+        while (a_src && strcmp(id_src, id_max) > 0) {
+            a_src = lire_ligne_val(fsrc, &ligne_src, &cap_src, id_src, sizeof(id_src), &v_src);
         }
-        while (res_real && strcmp(id_real, id_max) > 0) {
-            res_real = lire_ligne_val(flux_real, &tampon_real, &taille_real, id_real, sizeof(id_real), &val_real);
+        while (a_real && strcmp(id_real, id_max) > 0) {
+            a_real = lire_ligne_val(freal, &ligne_real, &cap_real, id_real, sizeof(id_real), &v_real);
         }
 
-        double vol_src  = (res_src  && strcmp(id_src,  id_max) == 0) ? val_src  : 0.0;
-        double vol_real = (res_real && strcmp(id_real, id_max) == 0) ? val_real : 0.0;
+        double src  = (a_src  && strcmp(id_src,  id_max) == 0) ? v_src  : 0.0;
+        double real = (a_real && strcmp(id_real, id_max) == 0) ? v_real : 0.0;
 
-        double vert = val_max - vol_src;
-        double rouge   = vol_src - vol_real;
-        double bleu  = vol_real;
+        double green = v_max - src;
+        double red   = src - real;
+        double blue  = real;
 
-        if (vert < 0.0) vert = 0.0;
-        if (rouge   < 0.0) rouge   = 0.0;
-        if (bleu  < 0.0) bleu  = 0.0;
+        if (green < 0.0) green = 0.0;
+        if (red   < 0.0) red   = 0.0;
+        if (blue  < 0.0) blue  = 0.0;
 
-        fprintf(flux_sortie, "%s;%.10g;%.10g;%.10g\n", id_max, vert, rouge, bleu);
+        fprintf(fout, "%s;%.10g;%.10g;%.10g\n", id_max, green, red, blue);
     }
 
-    free(tampon_src);
-    free(tampon_real);
-    free(tampon_max);
+    free(ligne_src);
+    free(ligne_real);
+    free(ligne_max);
 
-    fclose(flux_max);
-    fclose(flux_src);
-    fclose(flux_real);
-    fclose(flux_sortie);
+    fclose(fmax);
+    fclose(fsrc);
+    fclose(freal);
+    fclose(fout);
 
     return 0;
 }

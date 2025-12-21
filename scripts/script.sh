@@ -2,21 +2,18 @@
 
 export LC_ALL=C
 
-
-#Couleur
+#couleur
 R='\033[0;31m' # Rouge (Erreur)
 G='\033[0;32m' # Vert (Succès)
 B='\033[0;34m' # Bleu (Info)
 Y='\033[1;33m' # Jaune (Titre)
 N='\033[0m'    # Neutre
 
-#Si bash avant make alors erreur
 if [ ! -f "exec/Wildwater" ]; then
     echo -e "${R}Erreur : L'exécutable exec/Wildwater est introuvable.${N}"
     echo -e "${R}Veuillez lancer 'make' avant d'exécuter ce script.${N}"
     exit 1
 fi
-
 
 START=$(date +%s%3N)
 
@@ -38,17 +35,16 @@ if [ $# -lt 3 ]; then
 fi
 
 FILE="$1"
-ACT="$2" # Action (histo/leaks)
-OPT="$3" # Option (mode ou ID)
+ACT="$2" 
+OPT="$3" 
 
 if [ ! -f "$FILE" ]; then
     finish_ms 1 "Erreur : fichier $FILE introuvable"
 fi
 
-# Création des dossiers
+
 mkdir -p data data/histo data/dat data/tmp data/leaks
 
-# Conversion des CSV en DAT
 
 csv_to_dat() {
     IN="$1"
@@ -60,13 +56,12 @@ csv_to_dat() {
 
 case "$ACT" in histo)
 
+#HISTOGRAMMES 
 
-####HISTOGRAMMES######
 
-
-    ##############
-    # HISTO REAL # 
-    ##############
+    
+    # ---HISTO REAL ---# 
+    
     if [ "$OPT" = "max" ]; then
         CSV="data/histo/histo_max.csv"
         DAT="data/dat/histo_max.dat"
@@ -125,9 +120,9 @@ EOF
         finish_ms 0
     fi
 
-    ##############
-    # HISTO SRC # 
-    ##############
+    
+    # ---HISTO SRC ---# 
+    
     if [ "$OPT" = "src" ]; then
         CSV="data/histo/histo_src.csv"
         DAT="data/dat/histo_src.dat"
@@ -219,9 +214,8 @@ EOF
         finish_ms 0
     fi
 
-    ##############
-    # HISTO REAL # 
-    ##############
+    # ---HISTO REAL--- # 
+    
     if [ "$OPT" = "real" ]; then
         CSV="data/histo/histo_real.csv"
         DAT="data/dat/histo_real.dat"
@@ -260,7 +254,7 @@ EOF
 
         echo "identifier;real_volume(k.m3.year-1)" > "$CSV"
 
-        # entrée : ID;VOLUME;FUITE
+        # entrée : ID;   VOLUME    ;FUITE
         awk -F';' '$1=="-" && $3!="-" && $4!="-" && $5!="-" { print $3 ";" $4 ";" $5 }' \
             "$FILE" > "$T_IN"
         [ -s "$T_IN" ] || finish_ms 1 "[ERREUR] T_IN vide : aucun flux source->usine."
@@ -313,9 +307,9 @@ EOF
         finish_ms 0
     fi
 
-    ##############
-    # HISTO ALL # 
-    ##############
+    
+    #--- HISTO ALL ---# 
+    
     if [ "$OPT" = "all" ]; then
         C_OUT="data/histo/histo_all.csv"
         D_OUT="data/dat/histo_all.dat"
@@ -418,13 +412,23 @@ EOF
     finish_ms 1 "Erreur : mode histo inconnu"
     ;;
 
-###################
 # ==== LEAKS ==== #
-###################
 
 leaks)
-    #Appel script.sh
+    
     TARGET="$OPT"
+
+
+    # Sécurité : ID usine valide
+    # =========================
+    if ! awk -F';' -v ID="$TARGET" '
+        $2==ID || $3==ID || $1==ID { found=1 }
+        END { exit(found ? 0 : 1) }
+    ' "$FILE"
+    then
+        finish_ms 1 "Erreur : '$TARGET' n'est pas un identifiant d'usine valide"
+    fi
+
 
     T_DIR="data/tmp"
     mkdir -p "$T_DIR"
@@ -446,23 +450,37 @@ leaks)
         make || finish_ms 1 "[ERREUR] Compilation impossible"
     fi
 
-    # Entrée : volume + fuite
+   
     awk -F';' -v ID="$TARGET" '
         $1=="-" && $3==ID && $4!="-" && $5!="-" { print $3 ";" $4 ";" $5 }
     ' "$FILE" > "$T_SRC"
 
-    # PARENT ENFANT et FUITE
-    awk -F';' '
-        $2!="-" && $3!="-" && $5!="-" { print $2 ";" $3 ";" $5 }
+  
+    awk -F';' -v ID="$TARGET" '
+        # USINE -> STOCKAGE (col1 "-", col2 usine, col3 stockage, col4 "-", col5 fuite)
+        $1=="-" && $2==ID && $3!="-" && $4=="-" && $5!="-" {
+            print $2 ";" $3 ";" $5;
+            next
+        }
+
+        # Tout le réseau aval (col1 = usine)
+        $1==ID && $2!="-" && $3!="-" && $5!="-" {
+            print $2 ";" $3 ";" $5
+        }
     ' "$FILE" > "$T_EDG"
 
-    # Appel C
+    #Sécurité
+    : > "$T_OUT"
+
     "$BIN" leaks "$TARGET" "$T_SRC" "$T_EDG" "$T_OUT" \
         || finish_ms 1 "[ERREUR] leaks (C) a échoué"
 
     [ -s "$T_OUT" ] || finish_ms 1 "[ERREUR] sortie leaks vide ($T_OUT)"
 
-    VAL="$(cat "$T_OUT")"
+    VAL="$(tr -d '\r\n' < "$T_OUT")"
+
+    echo "$VAL" | grep -Eq '^-?[0-9]+([.][0-9]+)?$' \
+        || finish_ms 1 "[ERREUR] sortie leaks invalide: '$VAL'"
 
     if [ ! -f "$L_DAT" ]; then
         echo "identifier;Leak volume (M.m3.year-1)" > "$L_DAT"
@@ -474,9 +492,10 @@ leaks)
     finish_ms 0
     ;;
 
-###########################
+
+
+
 # == COMMANDE INCONNUE == #
-###########################
 *)
     finish_ms 1 "Erreur : commande inconnue"
     ;;

@@ -2,11 +2,13 @@ CC      = gcc
 CFLAGS  = -Wall -Wextra -Werror -std=c99 -g -Iinclude -D_POSIX_C_SOURCE=200809L
 LDFLAGS = -lm
 
-#Couleurs
+#couleur
 B = \033[0;34m
 G = \033[0;32m
 Y = \033[1;33m
 N = \033[0m
+
+
 
 SRC = \
     src/main.c \
@@ -26,7 +28,6 @@ HEADERS = \
     include/leaks.h
 
 
-#Chemin
 
 EXEC_DIR = exec
 EXEC     = $(EXEC_DIR)/Wildwater
@@ -34,10 +35,8 @@ SCRIPT   = scripts/script.sh
 DATA     = exemple/data.csv
 
 
+
 .PHONY: all logo clean run histo-max histo-src histo-real histo-all leaks
-
-
-#Compilation 
 
 
 all: logo $(EXEC)
@@ -52,12 +51,13 @@ logo:
 	@echo "|__/|__/  |_|_|\__,_| \_/\_/ \__,_|\__\___|_|   "
 	@echo "$(N)"
 
-#compile TOUT
+
 $(EXEC): $(SRC) $(HEADERS)
 	@mkdir -p $(EXEC_DIR)
 	@echo "$(B)[CC]   Compilation complète du projet...$(N)"
 	@$(CC) $(CFLAGS) -o $(EXEC) $(SRC) $(LDFLAGS)
 	@echo "$(G)[OK]   Wildwater est prêt : $(EXEC)$(N)"
+
 
 
 clean:
@@ -68,10 +68,10 @@ clean:
 	@rm -rf data/tmp/* data/leaks/*.csv data/leaks/*.dat
 	@echo "$(G)[OK]   Terminé.$(N)"
 
+
 run: $(EXEC)
 	@./$(EXEC)
 
-#histo
 
 histo-max: $(EXEC)
 	@bash $(SCRIPT) $(DATA) histo max
