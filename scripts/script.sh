@@ -2,12 +2,20 @@
 
 export LC_ALL=C
 
-# --- COULEURS & STYLE ---
+
+#Couleur
 R='\033[0;31m' # Rouge (Erreur)
 G='\033[0;32m' # Vert (Succès)
 B='\033[0;34m' # Bleu (Info)
 Y='\033[1;33m' # Jaune (Titre)
 N='\033[0m'    # Neutre
+
+#Si bash avant make alors erreur
+if [ ! -f "exec/Wildwater" ]; then
+    echo -e "${R}Erreur : L'exécutable exec/Wildwater est introuvable.${N}"
+    echo -e "${R}Veuillez lancer 'make' avant d'exécuter ce script.${N}"
+    exit 1
+fi
 
 
 START=$(date +%s%3N)
@@ -37,14 +45,11 @@ if [ ! -f "$FILE" ]; then
     finish_ms 1 "Erreur : fichier $FILE introuvable"
 fi
 
-#######################
 # Création des dossiers
-#######################
 mkdir -p data data/histo data/dat data/tmp data/leaks
 
-###########################
 # Conversion des CSV en DAT
-###########################
+
 csv_to_dat() {
     IN="$1"
     OUT="$2"
@@ -55,9 +60,8 @@ csv_to_dat() {
 
 case "$ACT" in histo)
 
-############################################################
-# ====================== HISTOGRAMMES =====================#
-############################################################
+
+####HISTOGRAMMES######
 
 
     ##############
@@ -419,7 +423,7 @@ EOF
 ###################
 
 leaks)
-    # Appel : script.sh data.csv leaks "<ID_USINE>"
+    #Appel script.sh
     TARGET="$OPT"
 
     T_DIR="data/tmp"

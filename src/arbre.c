@@ -1,47 +1,56 @@
-#include "../include/arbre.h"
+#include "arbre.h"
 
-// Racine globale de l'AVL
+//Racine globale de l'AVL
 static Noeud* racine_avl = NULL;
 
-// --- Fonctions Utilitaires AVL (Interne) ---
 
-static int max(int a, int b) { return (a > b) ? a : b; }
-static int hauteur(Noeud* n) { return n ? n->hauteur : 0; }
+//Fonctions 
+static int max(int a, int b) {
+    return (a > b) ? a : b;
+}
+
+static int hauteur(Noeud* n) {
+    return n ? n->hauteur : 0;
+}
 
 static Noeud* nouveau_noeud(char* id) {
     Noeud* n = calloc(1, sizeof(Noeud));
-    if(!n) {
-        fprintf(stderr, "Erreur allocation mémoire\n");
+    if (!n) {
+        fprintf(stderr, "Erreur fatale : allocation mémoire échouée pour le noeud.\n");
         exit(1);
     }
+    //Copie sécurisée
     strncpy(n->id, id, 127);
+    n->id[127] = '\0'; 
     n->hauteur = 1;
     return n;
 }
 
+//Rotations AVL
+
 static Noeud* rotation_droite(Noeud* y) {
     Noeud* x = y->gauche;
     Noeud* T2 = x->droite;
-    
+
     x->droite = y;
     y->gauche = T2;
-    
+
     y->hauteur = max(hauteur(y->gauche), hauteur(y->droite)) + 1;
     x->hauteur = max(hauteur(x->gauche), hauteur(x->droite)) + 1;
-    
+
     return x;
 }
 
 static Noeud* rotation_gauche(Noeud* x) {
     Noeud* y = x->droite;
     Noeud* T2 = y->gauche;
-    
+
     y->gauche = x;
     x->droite = T2;
-    
+
     x->hauteur = max(hauteur(x->gauche), hauteur(x->droite)) + 1;
     y->hauteur = max(hauteur(y->gauche), hauteur(y->droite)) + 1;
-    
+
     return y;
 }
 
@@ -50,44 +59,39 @@ static int obtenir_equilibre(Noeud* n) {
     return hauteur(n->gauche) - hauteur(n->droite);
 }
 
+
 static Noeud* inserer_avl(Noeud* noeud, char* id, Noeud** resultat) {
-    // 1. Insertion normale d'ABR
     if (noeud == NULL) {
         *resultat = nouveau_noeud(id);
         return *resultat;
     }
 
     int cmp = strcmp(id, noeud->id);
+
     if (cmp < 0)
         noeud->gauche = inserer_avl(noeud->gauche, id, resultat);
     else if (cmp > 0)
         noeud->droite = inserer_avl(noeud->droite, id, resultat);
     else {
-        *resultat = noeud; // Trouvé !
+        *resultat = noeud;
         return noeud;
     }
 
-    // 2. Mise à jour hauteur
     noeud->hauteur = 1 + max(hauteur(noeud->gauche), hauteur(noeud->droite));
 
-    // 3. Équilibrage
     int equilibre = obtenir_equilibre(noeud);
 
-    // Cas Gauche-Gauche
     if (equilibre > 1 && strcmp(id, noeud->gauche->id) < 0)
         return rotation_droite(noeud);
 
-    // Cas Droite-Droite
     if (equilibre < -1 && strcmp(id, noeud->droite->id) > 0)
         return rotation_gauche(noeud);
 
-    // Cas Gauche-Droite
     if (equilibre > 1 && strcmp(id, noeud->gauche->id) > 0) {
         noeud->gauche = rotation_gauche(noeud->gauche);
         return rotation_droite(noeud);
     }
 
-    // Cas Droite-Gauche
     if (equilibre < -1 && strcmp(id, noeud->droite->id) < 0) {
         noeud->droite = rotation_droite(noeud->droite);
         return rotation_gauche(noeud);
@@ -96,7 +100,6 @@ static Noeud* inserer_avl(Noeud* noeud, char* id, Noeud** resultat) {
     return noeud;
 }
 
-// --- Fonctions Publiques ---
 
 Noeud* obtenir_noeud(char* id) {
     Noeud* res = NULL;
@@ -105,16 +108,19 @@ Noeud* obtenir_noeud(char* id) {
 }
 
 void ajouter_arete(char* id_parent, char* id_enfant, double fuite) {
+    
     Noeud* parent = obtenir_noeud(id_parent);
     Noeud* enfant = obtenir_noeud(id_enfant);
 
     Arete* nouvelle_arete = malloc(sizeof(Arete));
-    if (!nouvelle_arete) exit(1);
+    if (!nouvelle_arete) {
+        fprintf(stderr, "Erreur fatale : allocation mémoire arête.\n");
+        exit(1);
+    }
 
     nouvelle_arete->enfant = enfant;
     nouvelle_arete->pourcentage_fuite = fuite;
-    
-    // Insertion en tête de liste
+
     nouvelle_arete->suivant = parent->liste_enfants;
     parent->liste_enfants = nouvelle_arete;
 }
@@ -124,26 +130,29 @@ void ajouter_volume_source(char* id_usine, double volume) {
     n->volume_eau += volume;
 }
 
-// --- Libération Mémoire ---
+//Libère memoire
 
-static void liberer_arbre(Noeud* n) {
+static void liberer_arbre_recursif(Noeud* n) {
     if (!n) return;
-    
-    liberer_arbre(n->gauche);
-    liberer_arbre(n->droite);
-    
+
+    //sous-arbres
+    liberer_arbre_recursif(n->gauche);
+    liberer_arbre_recursif(n->droite);
+
+    //arêtes du graphe
     Arete* courant = n->liste_enfants;
     while (courant) {
         Arete* temp = courant;
         courant = courant->suivant;
         free(temp);
     }
+
     
-    // Le 'id' est dans le struct (tableau statique) donc pas de free(n->id)
+    //Libère tout le noeud
     free(n);
 }
 
 void liberer_tout(void) {
-    liberer_arbre(racine_avl);
+    liberer_arbre_recursif(racine_avl);
     racine_avl = NULL;
 }

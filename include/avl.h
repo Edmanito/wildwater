@@ -3,7 +3,7 @@
 
 #include <stdio.h>
 
-/* Usine */
+//Usine
 typedef struct {
     char *id;
     double max;
@@ -11,13 +11,12 @@ typedef struct {
     double real;
 } usine_t;
 
-/* AVL opaque */
+//AVL
 typedef struct noeud_avl noeud_avl_t;
 
-/* Strict minimum */
-noeud_avl_t *avl_inserer(noeud_avl_t *r, usine_t *u);
-usine_t    *avl_trouver(noeud_avl_t *r, const char *id);
-void        avl_ecrire(noeud_avl_t *r, FILE *out, int mode);
-void        avl_liberer(noeud_avl_t *r);
+noeud_avl_t *avl_inserer(noeud_avl_t *racine, usine_t *usine);
+usine_t    *avl_trouver(noeud_avl_t *racine, const char *id);
+void        avl_ecrire(noeud_avl_t *racine, FILE *flux, int mode);
+void        avl_liberer(noeud_avl_t *racine);
 
 #endif

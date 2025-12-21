@@ -2,55 +2,43 @@ CC      = gcc
 CFLAGS  = -Wall -Wextra -Werror -std=c99 -g -Iinclude -D_POSIX_C_SOURCE=200809L
 LDFLAGS = -lm
 
-# --- COULEURS ---
+#Couleurs
 B = \033[0;34m
 G = \033[0;32m
 Y = \033[1;33m
 N = \033[0m
 
-##############################################
-# Sources et Headers
-##############################################
-
 SRC = \
     src/main.c \
-    src/csv.c \
     src/avl.c \
     src/arbre.c \
-    src/utiles.c \
     src/histo_src.c \
     src/histo_real.c \
     src/histo_all.c \
     src/leaks.c
 
 HEADERS = \
-    include/csv.h \
     include/avl.h \
     include/arbre.h \
-    include/utiles.h \
     include/histo_src.h \
     include/histo_real.h \
     include/histo_all.h \
     include/leaks.h
 
-##############################################
-# Chemins
-##############################################
+
+#Chemin
 
 EXEC_DIR = exec
 EXEC     = $(EXEC_DIR)/Wildwater
 SCRIPT   = scripts/script.sh
 DATA     = exemple/data.csv
 
-##############################################
-# Phony
-##############################################
 
 .PHONY: all logo clean run histo-max histo-src histo-real histo-all leaks
 
-##############################################
-# Compilation DIRECTE (Sans .o)
-##############################################
+
+#Compilation 
+
 
 all: logo $(EXEC)
 
@@ -64,16 +52,13 @@ logo:
 	@echo "|__/|__/  |_|_|\__,_| \_/\_/ \__,_|\__\___|_|   "
 	@echo "$(N)"
 
-# Ici, on compile TOUT d'un coup : SRC -> EXEC
+#compile TOUT
 $(EXEC): $(SRC) $(HEADERS)
 	@mkdir -p $(EXEC_DIR)
 	@echo "$(B)[CC]   Compilation complète du projet...$(N)"
 	@$(CC) $(CFLAGS) -o $(EXEC) $(SRC) $(LDFLAGS)
 	@echo "$(G)[OK]   Wildwater est prêt : $(EXEC)$(N)"
 
-##############################################
-# Nettoyage
-##############################################
 
 clean:
 	@echo "$(Y)[CLEAN] Nettoyage...$(N)"
@@ -83,16 +68,10 @@ clean:
 	@rm -rf data/tmp/* data/leaks/*.csv data/leaks/*.dat
 	@echo "$(G)[OK]   Terminé.$(N)"
 
-##############################################
-# Exécution simple
-##############################################
-
 run: $(EXEC)
 	@./$(EXEC)
 
-##############################################
-# Commandes via Script
-##############################################
+#histo
 
 histo-max: $(EXEC)
 	@bash $(SCRIPT) $(DATA) histo max

@@ -5,118 +5,142 @@
 #include "avl.h"
 
 struct noeud_avl {
-    usine_t *u;
-    int h;
-    struct noeud_avl *g;
-    struct noeud_avl *d;
+    usine_t *usine;
+    int hauteur;
+    struct noeud_avl *gauche;
+    struct noeud_avl *droite;
 };
 
-static int h(noeud_avl_t *n) {
-    return n ? n->h : 0;
+static int hauteur(noeud_avl_t *noeud) {
+    return noeud ? noeud->hauteur : 0;
 }
 
-static int max2(int a, int b) {
+static int max(int a, int b) {
     return (a > b) ? a : b;
 }
 
-static int bal(noeud_avl_t *n) {
-    return n ? (h(n->g) - h(n->d)) : 0;
+static int equilibre(noeud_avl_t *noeud) {
+    return noeud ? (hauteur(noeud->gauche) - hauteur(noeud->droite)) : 0;
 }
 
-static noeud_avl_t *rot_droite(noeud_avl_t *y) {
-    noeud_avl_t *x = y->g;
-    noeud_avl_t *t2 = x->d;
-    x->d = y;
-    y->g = t2;
-    y->h = 1 + max2(h(y->g), h(y->d));
-    x->h = 1 + max2(h(x->g), h(x->d));
+static noeud_avl_t *rotation_droite(noeud_avl_t *y) {
+    noeud_avl_t *x = y->gauche;
+    noeud_avl_t *t2 = x->droite;
+    
+    x->droite = y;
+    y->gauche = t2;
+    
+    y->hauteur = 1 + max(hauteur(y->gauche), hauteur(y->droite));
+    x->hauteur = 1 + max(hauteur(x->gauche), hauteur(x->droite));
+    
     return x;
 }
 
-static noeud_avl_t *rot_gauche(noeud_avl_t *x) {
-    noeud_avl_t *y = x->d;
-    noeud_avl_t *t2 = y->g;
-    y->g = x;
-    x->d = t2;
-    x->h = 1 + max2(h(x->g), h(x->d));
-    y->h = 1 + max2(h(y->g), h(y->d));
+static noeud_avl_t *rotation_gauche(noeud_avl_t *x) {
+    noeud_avl_t *y = x->droite;
+    noeud_avl_t *t2 = y->gauche;
+    
+    y->gauche = x;
+    x->droite = t2;
+    
+    x->hauteur = 1 + max(hauteur(x->gauche), hauteur(x->droite));
+    y->hauteur = 1 + max(hauteur(y->gauche), hauteur(y->droite));
+    
     return y;
 }
 
-static noeud_avl_t *noeud_creer(usine_t *u) {
-    noeud_avl_t *n = malloc(sizeof(*n));
-    if (!n) return NULL;
-    n->u = u;
-    n->h = 1;
-    n->g = NULL;
-    n->d = NULL;
-    return n;
+static noeud_avl_t *noeud_creer(usine_t *usine) {
+    noeud_avl_t *noeud = malloc(sizeof(*noeud));
+    if (!noeud) return NULL;
+    
+    noeud->usine = usine;
+    noeud->hauteur = 1;
+    noeud->gauche = NULL;
+    noeud->droite = NULL;
+    
+    return noeud;
 }
 
-noeud_avl_t *avl_inserer(noeud_avl_t *r, usine_t *u) {
-    if (!u || !u->id) return r;
+noeud_avl_t *avl_inserer(noeud_avl_t *racine, usine_t *usine) {
+    if (!usine || !usine->id) return racine;
 
-    if (!r) return noeud_creer(u);
+    if (!racine) return noeud_creer(usine);
 
-    int c = strcmp(u->id, r->u->id);
-    if (c < 0) {
-        r->g = avl_inserer(r->g, u);
-    } else if (c > 0) {
-        r->d = avl_inserer(r->d, u);
+    int comparaison = strcmp(usine->id, racine->usine->id);
+    
+    if (comparaison < 0) {
+        racine->gauche = avl_inserer(racine->gauche, usine);
+    } else if (comparaison > 0) {
+        racine->droite = avl_inserer(racine->droite, usine);
     } else {
-        return r;
+        return racine;
     }
 
-    r->h = 1 + max2(h(r->g), h(r->d));
-    int b = bal(r);
+    racine->hauteur = 1 + max(hauteur(racine->gauche), hauteur(racine->droite));
+    
+    int facteur = equilibre(racine);
 
-    if (b > 1 && strcmp(u->id, r->g->u->id) < 0) return rot_droite(r);
-    if (b < -1 && strcmp(u->id, r->d->u->id) > 0) return rot_gauche(r);
-    if (b > 1 && strcmp(u->id, r->g->u->id) > 0) { r->g = rot_gauche(r->g); return rot_droite(r); }
-    if (b < -1 && strcmp(u->id, r->d->u->id) < 0) { r->d = rot_droite(r->d); return rot_gauche(r); }
+    if (facteur > 1 && strcmp(usine->id, racine->gauche->usine->id) < 0) 
+        return rotation_droite(racine);
+    
+    if (facteur < -1 && strcmp(usine->id, racine->droite->usine->id) > 0) 
+        return rotation_gauche(racine);
+    
+    if (facteur > 1 && strcmp(usine->id, racine->gauche->usine->id) > 0) {
+        racine->gauche = rotation_gauche(racine->gauche);
+        return rotation_droite(racine);
+    }
+    
+    if (facteur < -1 && strcmp(usine->id, racine->droite->usine->id) < 0) {
+        racine->droite = rotation_droite(racine->droite);
+        return rotation_gauche(racine);
+    }
 
-    return r;
+    return racine;
 }
 
-usine_t *avl_trouver(noeud_avl_t *r, const char *id) {
-    while (r) {
-        int c = strcmp(id, r->u->id);
-        if (c == 0) return r->u;
-        r = (c < 0) ? r->g : r->d;
+usine_t *avl_trouver(noeud_avl_t *racine, const char *id) {
+    while (racine) {
+        int comparaison = strcmp(id, racine->usine->id);
+        if (comparaison == 0) return racine->usine;
+        racine = (comparaison < 0) ? racine->gauche : racine->droite;
     }
     return NULL;
 }
 
-static double valeur_selon_mode(const usine_t *u, int mode) {
-    if (!u) return 0.0;
-    if (mode == 0) return u->max;
-    if (mode == 1) return u->src;
-    if (mode == 2) return u->real;
+static double valeur_selon_mode(const usine_t *usine, int mode) {
+    if (!usine) return 0.0;
+    if (mode == 0) return usine->max;
+    if (mode == 1) return usine->src;
+    if (mode == 2) return usine->real;
     return 0.0;
 }
 
-static void ecrire_infixe(noeud_avl_t *r, FILE *out, int mode) {
-    if (!r) return;
-    ecrire_infixe(r->g, out, mode);
-    fprintf(out, "%s;%.10g\n", r->u->id, valeur_selon_mode(r->u, mode));
-    ecrire_infixe(r->d, out, mode);
+static void ecrire_infixe(noeud_avl_t *racine, FILE *flux, int mode) {
+    if (!racine) return;
+    
+    ecrire_infixe(racine->gauche, flux, mode);
+    fprintf(flux, "%s;%.10g\n", racine->usine->id, valeur_selon_mode(racine->usine, mode));
+    ecrire_infixe(racine->droite, flux, mode);
 }
 
-void avl_ecrire(noeud_avl_t *r, FILE *out, int mode) {
-    if (!out) return;
-    ecrire_infixe(r, out, mode);
+void avl_ecrire(noeud_avl_t *racine, FILE *flux, int mode) {
+    if (!flux) return;
+    ecrire_infixe(racine, flux, mode);
 }
 
-static void liberer_usine(usine_t *u) {
-    if (!u) return;
-    free(u->id);
-    free(u);
+static void liberer_usine(usine_t *usine) {
+    if (!usine) return;
+    free(usine->id);
+    free(usine);
 }
 
-void avl_liberer(noeud_avl_t *r) {
-    if (!r) return;
-    avl_liberer(r->g);
-    avl_liberer(r->d);
-    liberer_usine(r->u);
-    free(r);
+void avl_liberer(noeud_avl_t *racine) {
+    if (!racine) return;
+    
+    avl_liberer(racine->gauche);
+    avl_liberer(racine->droite);
+    
+    liberer_usine(racine->usine);
+    free(racine);
 }
