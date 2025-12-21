@@ -1,20 +1,21 @@
 #include "../include/arbre.h"
 
-// Racine globale de l'AVL
+//racine
 static Noeud* racine_avl = NULL;
 
-// --- Fonctions Utilitaires AVL (Interne) ---
+//fonctions
 
 static int max(int a, int b) { return (a > b) ? a : b; }
 static int hauteur(Noeud* n) { return n ? n->hauteur : 0; }
 
-static Noeud* nouveau_noeud(char* id) {
+static Noeud* nouveau_noeud(const char* id) {
     Noeud* n = calloc(1, sizeof(Noeud));
     if(!n) {
         fprintf(stderr, "Erreur allocation mémoire\n");
         exit(1);
     }
     strncpy(n->id, id, 127);
+    n->id[127] = '\0';
     n->hauteur = 1;
     return n;
 }
@@ -22,26 +23,26 @@ static Noeud* nouveau_noeud(char* id) {
 static Noeud* rotation_droite(Noeud* y) {
     Noeud* x = y->gauche;
     Noeud* T2 = x->droite;
-    
+
     x->droite = y;
     y->gauche = T2;
-    
+
     y->hauteur = max(hauteur(y->gauche), hauteur(y->droite)) + 1;
     x->hauteur = max(hauteur(x->gauche), hauteur(x->droite)) + 1;
-    
+
     return x;
 }
 
 static Noeud* rotation_gauche(Noeud* x) {
     Noeud* y = x->droite;
     Noeud* T2 = y->gauche;
-    
+
     y->gauche = x;
     x->droite = T2;
-    
+
     x->hauteur = max(hauteur(x->gauche), hauteur(x->droite)) + 1;
     y->hauteur = max(hauteur(y->gauche), hauteur(y->droite)) + 1;
-    
+
     return y;
 }
 
@@ -50,8 +51,8 @@ static int obtenir_equilibre(Noeud* n) {
     return hauteur(n->gauche) - hauteur(n->droite);
 }
 
-static Noeud* inserer_avl(Noeud* noeud, char* id, Noeud** resultat) {
-    // 1. Insertion normale d'ABR
+static Noeud* inserer_avl(Noeud* noeud, const char* id, Noeud** resultat) {
+  
     if (noeud == NULL) {
         *resultat = nouveau_noeud(id);
         return *resultat;
@@ -63,31 +64,25 @@ static Noeud* inserer_avl(Noeud* noeud, char* id, Noeud** resultat) {
     else if (cmp > 0)
         noeud->droite = inserer_avl(noeud->droite, id, resultat);
     else {
-        *resultat = noeud; // Trouvé !
+        *resultat = noeud;
         return noeud;
     }
 
-    // 2. Mise à jour hauteur
     noeud->hauteur = 1 + max(hauteur(noeud->gauche), hauteur(noeud->droite));
 
-    // 3. Équilibrage
     int equilibre = obtenir_equilibre(noeud);
 
-    // Cas Gauche-Gauche
     if (equilibre > 1 && strcmp(id, noeud->gauche->id) < 0)
         return rotation_droite(noeud);
 
-    // Cas Droite-Droite
     if (equilibre < -1 && strcmp(id, noeud->droite->id) > 0)
         return rotation_gauche(noeud);
 
-    // Cas Gauche-Droite
     if (equilibre > 1 && strcmp(id, noeud->gauche->id) > 0) {
         noeud->gauche = rotation_gauche(noeud->gauche);
         return rotation_droite(noeud);
     }
 
-    // Cas Droite-Gauche
     if (equilibre < -1 && strcmp(id, noeud->droite->id) < 0) {
         noeud->droite = rotation_droite(noeud->droite);
         return rotation_gauche(noeud);
@@ -96,15 +91,14 @@ static Noeud* inserer_avl(Noeud* noeud, char* id, Noeud** resultat) {
     return noeud;
 }
 
-// --- Fonctions Publiques ---
 
-Noeud* obtenir_noeud(char* id) {
+Noeud* obtenir_noeud(const char* id) {
     Noeud* res = NULL;
     racine_avl = inserer_avl(racine_avl, id, &res);
     return res;
 }
 
-void ajouter_arete(char* id_parent, char* id_enfant, double fuite) {
+void ajouter_arete(const char* id_parent, const char* id_enfant, double fuite) {
     Noeud* parent = obtenir_noeud(id_parent);
     Noeud* enfant = obtenir_noeud(id_enfant);
 
@@ -113,33 +107,31 @@ void ajouter_arete(char* id_parent, char* id_enfant, double fuite) {
 
     nouvelle_arete->enfant = enfant;
     nouvelle_arete->pourcentage_fuite = fuite;
-    
-    // Insertion en tête de liste
+
     nouvelle_arete->suivant = parent->liste_enfants;
     parent->liste_enfants = nouvelle_arete;
 }
 
-void ajouter_volume_source(char* id_usine, double volume) {
+void ajouter_volume_source(const char* id_usine, double volume) {
     Noeud* n = obtenir_noeud(id_usine);
     n->volume_eau += volume;
 }
 
-// --- Libération Mémoire ---
+//free memoire
 
 static void liberer_arbre(Noeud* n) {
     if (!n) return;
-    
+
     liberer_arbre(n->gauche);
     liberer_arbre(n->droite);
-    
+
     Arete* courant = n->liste_enfants;
     while (courant) {
         Arete* temp = courant;
         courant = courant->suivant;
         free(temp);
     }
-    
-    // Le 'id' est dans le struct (tableau statique) donc pas de free(n->id)
+
     free(n);
 }
 

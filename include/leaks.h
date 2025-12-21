@@ -1,7 +1,9 @@
 #ifndef LEAKS_H
 #define LEAKS_H
 
-// Lit stdin, calcule, et écrit le résultat dans fichier_sortie si l'ID n'existe pas
-void traiter_fuites_stdin(const char* fichier_sortie);
+int calculer_leaks_usine(const char* id_usine,
+                         const char* sources_tmp,
+                         const char* edges_tmp,
+                         const char* out_tmp);
 
 #endif

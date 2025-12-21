@@ -5,25 +5,17 @@
 
 #include "histo_all.h"
 
-/* Enlève le \n et le \r en fin de ligne (Windows/Linux) */
+//supprime le \n et le \r 
 static void enlever_retour_ligne(char *s) {
     if (!s) return;
     s[strcspn(s, "\r\n")] = '\0';
 }
 
-/*
- * Lit la prochaine ligne "id;valeur" dans un fichier CSV.
- * - ignore les lignes vides
- * - ignore l'en-tête "identifier;..."
- * Retour :
- *   1 si une donnée a été lue (id + valeur valides)
- *   0 si EOF
- */
 static int lire_ligne_val(FILE *f, char **ligne, size_t *cap,
                           char *id, size_t idsz, double *val)
 {
     while (1) {
-        if (getline(ligne, cap, f) == -1) return 0; /* EOF */
+        if (getline(ligne, cap, f) == -1) return 0; 
 
         enlever_retour_ligne(*ligne);
 
@@ -49,12 +41,7 @@ static int lire_ligne_val(FILE *f, char **ligne, size_t *cap,
     }
 }
 
-/*
-  Construit histo_all.csv à partir de max/src/real :
-  green = max - src
-  red   = src - real
-  blue  = real
-*/
+
 int generer_histo_all(const char *csv_max,
                       const char *csv_src,
                       const char *csv_real,
